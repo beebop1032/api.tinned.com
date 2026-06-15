@@ -1,0 +1,83 @@
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+        Symfony\Component\Security\Core\User\InMemoryUser: 'auto'
+
+    providers:
+        chain_provider:
+            chain:
+                providers: [ app_key_users, app_user_provider ]
+        doc_users:
+            memory:
+                users:
+                    doc:
+                        password: '%env(DOC_USER_PASSWORD)%'
+                        roles: [ROLE_API_DOCS]
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: email
+        app_key_users:
+            memory:
+                users:
+                    app_client:
+                        password: ''
+                        roles: [ ROLE_APP ]
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        docs:
+            pattern: ^/(docs|api/docs)
+            stateless: true
+            provider: doc_users
+            http_basic: ~
+
+        login:
+            pattern: ^/api/login$
+            stateless: true
+            provider: app_user_provider     # 👈 fix ambiguïté
+            user_checker: App\Security\UserChecker
+            json_login:
+                check_path: /api/login
+                username_path: email
+                password_path: password
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: chain_provider
+            user_checker: App\Security\UserChecker
+            custom_authenticators:
+                - App\Security\AppKeyAuthenticator
+            jwt: ~
+
+        main:
+            lazy: true
+            provider: app_user_provider
+
+    access_control:
+        - { path: ^/api, roles: PUBLIC_ACCESS, methods: [ OPTIONS ] }
+        - { path: ^/api/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/register$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/request_password_reset$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/reset_password$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/oauth/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/me$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api/(delivery_methods|shipping_labels|store_orders), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/api/(landing_pages|static_pages), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/api/(blog_boxes|business_boxes|store_boxes|travel_boxes|articles|trips|products|product_attributes|product_attribute_values|product_variants), roles: IS_AUTHENTICATED_FULLY, methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/(docs|api/docs), roles: ROLE_API_DOCS }
+        - { path: ^/api$, roles: ROLE_API_DOCS }
+        - { path: ^/api/payment/webhook$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/admin/media$, roles: IS_AUTHENTICATED_FULLY, methods: [POST] }
+        - { path: ^/api/my_orders/\d+/invoice$, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/my_store_orders/\d+/supplier-invoice$, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/my_store_orders, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api, roles: PUBLIC_ACCESS, methods: [ GET ] }
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

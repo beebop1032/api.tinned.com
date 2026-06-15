@@ -1,0 +1,81 @@
+# This file is the entry point to configure your own services.
+# Files in the packages/ subdirectory configure your dependencies.
+
+# Put parameters here that don't need to change on each machine where the app is deployed
+# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
+parameters:
+    app.version: '1.0.0'
+    app.public_base_url: '%env(default::APP_PUBLIC_BASE_URL)%'
+    app.mailer_from: '%env(MAILER_FROM)%'
+
+services:
+    _instanceof:
+        App\Service\Shipping\CarrierLabelAdapterInterface:
+            tags: ['app.shipping_label_adapter']
+
+    # default configuration for services in *this* file
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\:
+        resource: '../src/'
+
+    App\OpenApi\SecurityDecorator:
+        decorates: 'api_platform.openapi.factory'
+        arguments: [ '@App\OpenApi\SecurityDecorator.inner' ]
+
+    App\Security\AppKeyAuthenticator:
+        arguments:
+            $applicationApiKey: '%env(APP_API_KEY)%'
+
+    App\Provider\App\VersionProvider:
+        arguments:
+            $appVersion: '%app.version%'
+
+    App\Controller\OAuthCallbackController:
+        arguments:
+            $deepLinkScheme: '%env(APP_OAUTH_DEEP_LINK_SCHEME)%'
+
+    App\Processor\User\RequestPasswordResetProcessor:
+        arguments:
+            $publicBaseUrl: '%app.public_base_url%'
+            $mailerFrom: '%app.mailer_from%'
+
+    App\Service\Shipping\ShippingSender:
+        arguments:
+            $name: '%env(SHIPPING_SENDER_NAME)%'
+            $street: '%env(SHIPPING_SENDER_STREET)%'
+            $streetNumber: '%env(SHIPPING_SENDER_STREET_NUMBER)%'
+            $postalCode: '%env(SHIPPING_SENDER_POSTAL_CODE)%'
+            $city: '%env(SHIPPING_SENDER_CITY)%'
+            $countryCode: '%env(SHIPPING_SENDER_COUNTRY_CODE)%'
+            $phone: '%env(SHIPPING_SENDER_PHONE)%'
+            $email: '%env(SHIPPING_SENDER_EMAIL)%'
+
+    App\Service\Shipping\Adapter\DpdLabelAdapter:
+        arguments:
+            $apiUrl: '%env(DPD_API_URL)%'
+            $username: '%env(DPD_API_USERNAME)%'
+            $password: '%env(DPD_API_PASSWORD)%'
+
+    App\Service\Shipping\Adapter\MondialRelayLabelAdapter:
+        arguments:
+            $apiUrl: '%env(MONDIAL_RELAY_API_V2_URL)%'
+            $brandId: '%env(MONDIAL_RELAY_API_V2_BRAND_ID)%'
+            $login: '%env(MONDIAL_RELAY_API_V2_LOGIN)%'
+            $password: '%env(MONDIAL_RELAY_API_V2_PASSWORD)%'
+
+    App\Service\Shipping\Adapter\BpostLabelAdapter:
+        arguments:
+            $apiUrl: '%env(BPOST_API_URL)%'
+            $username: '%env(BPOST_API_USERNAME)%'
+            $password: '%env(BPOST_API_PASSWORD)%'
+
+    App\Service\Payment\MollieService:
+        arguments:
+            $apiKey: '%env(MOLLIE_API_KEY)%'
+            $redirectUrl: '%env(MOLLIE_REDIRECT_URL)%'
+            $webhookUrl: '%env(MOLLIE_WEBHOOK_URL)%'

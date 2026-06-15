@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f5f5f5; }
+    .total { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Facture fournisseur — {{ storeOrder.storeNameSnapshot }}</h1>
+  <p>Commande liée : {{ storeOrder.customerOrder.reference }} | Date : {{ storeOrder.createdAt|date('d/m/Y') }}</p>
+  <table>
+    <thead>
+      <tr><th>Produit</th><th>SKU</th><th>Qté</th><th>Prix HT</th><th>Marge Tinned 25%</th><th>Votre part</th></tr>
+    </thead>
+    <tbody>
+      {% for line in storeOrder.lines %}
+      {% set priceCents = line.variant.priceCents * line.quantity %}
+      {% set margeCents = (priceCents * 0.25)|round %}
+      {% set partCents = priceCents - margeCents %}
+      <tr>
+        <td>{{ line.variant.product.name }}</td>
+        <td>{{ line.variant.sku }}</td>
+        <td>{{ line.quantity }}</td>
+        <td>{{ (priceCents / 100)|number_format(2, ',', ' ') }} €</td>
+        <td>{{ (margeCents / 100)|number_format(2, ',', ' ') }} €</td>
+        <td>{{ (partCents / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="total">
+        <td colspan="5">Total à vous verser</td>
+        <td>{{ (storeOrder.subtotalCents * 0.75 / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+    </tfoot>
+  </table>
+</body>
+</html>

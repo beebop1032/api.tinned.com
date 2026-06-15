@@ -1,0 +1,6 @@
+The make:use-case command creates the basic files for an application use case.
+
+Examples:
+
+  php bin/console make:use-case Account/CreateProfile
+  php bin/console make:use-case Billing/ExportInvoices
