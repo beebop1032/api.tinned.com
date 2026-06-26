@@ -1,5 +1,5 @@
 api_platform:
-    title: Appbeta API
+    title: Tinned API
     version: '%app.version%'
     eager_loading:
         max_joins: 80
