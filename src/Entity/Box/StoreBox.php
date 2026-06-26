@@ -5,6 +5,7 @@ namespace App\Entity\Box;
 use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -40,6 +41,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 class StoreBox extends Box
 {
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'storeBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[ORM\JoinColumn(nullable: false)]
     #[Assert\NotNull(message: 'Une StoreBox doit être rattachée à une BusinessBox.')]
     #[Groups(['box:read', 'box:write', 'product:read'])]

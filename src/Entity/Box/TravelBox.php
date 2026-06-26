@@ -5,6 +5,7 @@ namespace App\Entity\Box;
 use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -41,10 +42,12 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 class TravelBox extends Box
 {
     #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'childTravelBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write'])]
     private ?TravelBox $parentTravelBox = null;
 
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'travelBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write'])]
     private ?BusinessBox $businessBox = null;
 

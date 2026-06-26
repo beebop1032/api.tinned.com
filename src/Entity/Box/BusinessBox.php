@@ -5,6 +5,7 @@ namespace App\Entity\Box;
 use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -48,10 +49,12 @@ class BusinessBox extends Box
     private ?string $website = null;
 
     #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'businessBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write'])]
     private ?TravelBox $travelBox = null;
 
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'childBusinessBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write'])]
     private ?BusinessBox $parentBusinessBox = null;
 

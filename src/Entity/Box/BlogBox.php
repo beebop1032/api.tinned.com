@@ -5,6 +5,7 @@ namespace App\Entity\Box;
 use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -41,14 +42,17 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 class BlogBox extends Box
 {
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'blogBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write', 'article:read'])]
     private ?BusinessBox $businessBox = null;
 
     #[ORM\ManyToOne(targetEntity: StoreBox::class, inversedBy: 'blogBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write', 'article:read'])]
     private ?StoreBox $storeBox = null;
 
     #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'blogBoxes')]
+    #[ApiProperty(fetchEager: false)]
     #[Groups(['box:read', 'box:write', 'article:read'])]
     private ?TravelBox $travelBox = null;
 
