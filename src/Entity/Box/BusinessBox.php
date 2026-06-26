@@ -16,6 +16,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity]
 #[ApiResource(
@@ -97,4 +99,14 @@ class BusinessBox extends Box
     public function getChildBusinessBoxes(): Collection { return $this->childBusinessBoxes; }
 
     public function getParentBox(): ?Box { return $this->travelBox ?? $this->parentBusinessBox; }
+
+    #[Assert\Callback]
+    public function validateSingleParent(ExecutionContextInterface $context): void
+    {
+        if ($this->travelBox !== null && $this->parentBusinessBox !== null) {
+            $context->buildViolation('Une BusinessBox ne peut avoir qu\'un seul parent (Travel ou Business).')
+                ->atPath('travelBox')
+                ->addViolation();
+        }
+    }
 }

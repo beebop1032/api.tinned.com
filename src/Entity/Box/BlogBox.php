@@ -17,6 +17,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity]
 #[ApiResource(
@@ -71,4 +73,15 @@ class BlogBox extends Box
     public function getArticles(): Collection { return $this->articles; }
 
     public function getParentBox(): ?Box { return $this->travelBox ?? $this->businessBox ?? $this->storeBox; }
+
+    #[Assert\Callback]
+    public function validateSingleParent(ExecutionContextInterface $context): void
+    {
+        $count = (int) ($this->travelBox !== null) + (int) ($this->businessBox !== null) + (int) ($this->storeBox !== null);
+        if ($count !== 1) {
+            $context->buildViolation('Une BlogBox doit être rattachée à exactement une box (Travel, Business ou Store).')
+                ->atPath('businessBox')
+                ->addViolation();
+        }
+    }
 }

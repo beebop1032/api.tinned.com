@@ -17,6 +17,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity]
 #[ApiResource(
@@ -89,6 +91,16 @@ class TravelBox extends Box
     public function getBlogBoxes(): Collection { return $this->blogBoxes; }
 
     public function getParentBox(): ?Box { return $this->parentTravelBox ?? $this->businessBox; }
+
+    #[Assert\Callback]
+    public function validateSingleParent(ExecutionContextInterface $context): void
+    {
+        if ($this->parentTravelBox !== null && $this->businessBox !== null) {
+            $context->buildViolation('Une TravelBox ne peut avoir qu\'un seul parent (Travel ou Business).')
+                ->atPath('parentTravelBox')
+                ->addViolation();
+        }
+    }
 
     public function addTrip(Trip $trip): self
     {

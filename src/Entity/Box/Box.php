@@ -5,6 +5,8 @@ namespace App\Entity\Box;
 use App\Entity\User;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity]
 #[ORM\InheritanceType('JOINED')]
@@ -80,6 +82,22 @@ abstract class Box
 
     /** Le parent unique de ce box dans la hiérarchie, ou null si racine. */
     abstract public function getParentBox(): ?Box;
+
+    #[Assert\Callback]
+    public function validateNoCycle(ExecutionContextInterface $context): void
+    {
+        $ancestor = $this->getParentBox();
+        $steps = 0;
+        while ($ancestor !== null && $steps < 100) {
+            if ($ancestor === $this) {
+                $context->buildViolation('Un box ne peut pas être son propre ancêtre (cycle interdit).')
+                    ->addViolation();
+                return;
+            }
+            $ancestor = $ancestor->getParentBox();
+            $steps++;
+        }
+    }
 
     public function getId(): ?int { return $this->id; }
     public function getName(): string { return $this->name; }

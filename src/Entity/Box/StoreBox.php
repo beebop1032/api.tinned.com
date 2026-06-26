@@ -17,6 +17,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ApiResource(
@@ -40,6 +41,7 @@ class StoreBox extends Box
 {
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'storeBoxes')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Assert\NotNull(message: 'Une StoreBox doit être rattachée à une BusinessBox.')]
     #[Groups(['box:read', 'box:write', 'product:read'])]
     private ?BusinessBox $businessBox = null;
 
