@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Déploiement prod de l'API Tinned.
+# À lancer sur le serveur, EN ROOT (ou via sudo) :
+#
+#     sudo bash /var/www/api.tinned.com/deploy.sh
+#
+# Pré-requis : avoir lancé UNE SEULE FOIS le bloc "setup ACL" du README ci-dessous
+# (voir docs/DEPLOY.md). Une fois fait, ce script ne casse plus jamais les permissions.
+
+set -euo pipefail
+
+APP_DIR="/var/www/api.tinned.com"
+WEB_USER="www-data"
+PHP="php8.4"
+
+cd "$APP_DIR"
+
+echo "==> 1/5  Récupération du code"
+git pull --ff-only
+
+echo "==> 2/5  Dépendances (prod, optimisées)"
+# composer en tant que www-data pour que vendor/ ait le bon propriétaire
+sudo -u "$WEB_USER" composer install --no-dev --optimize-autoloader --no-interaction
+
+echo "==> 3/5  Migrations base de données"
+sudo -u "$WEB_USER" "$PHP" bin/console d:s:u --force --no-interaction --env=prod
+
+echo "==> 4/5  Reconstruction du cache (en tant que $WEB_USER)"
+# On vide puis on chauffe le cache AVEC l'utilisateur d'exécution :
+# les fichiers sont donc créés directement avec le bon propriétaire.
+rm -rf var/cache/prod/*
+sudo -u "$WEB_USER" "$PHP" bin/console cache:clear  --env=prod --no-debug
+sudo -u "$WEB_USER" "$PHP" bin/console cache:warmup --env=prod --no-debug
+
+echo "==> 5/5  Filet de sécurité permissions (idempotent, instantané)"
+# Grâce aux ACL par défaut posées une fois (voir docs/DEPLOY.md), c'est déjà bon,
+# mais on réapplique au cas où un fichier aurait été créé par root.
+setfacl -R  -m u:"$WEB_USER":rwX -m u:root:rwX var/
+setfacl -dR -m u:"$WEB_USER":rwX -m u:root:rwX var/
+
+echo "==> OK. Déploiement terminé."
