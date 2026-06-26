@@ -13,6 +13,9 @@ set -euo pipefail
 APP_DIR="/var/www/api.tinned.com"
 WEB_USER="www-data"
 PHP="php8.4"
+# composer est un phar : on le lance explicitement avec php8.4, car le `php` par
+# défaut du serveur est 7.4 et ne sait pas parser le code PHP 8 des dépendances.
+COMPOSER_BIN="$(command -v composer)"
 
 cd "$APP_DIR"
 
@@ -21,7 +24,7 @@ git pull --ff-only
 
 echo "==> 2/5  Dépendances (prod, optimisées)"
 # composer en tant que www-data pour que vendor/ ait le bon propriétaire
-sudo -u "$WEB_USER" composer install --no-dev --optimize-autoloader --no-interaction
+sudo -u "$WEB_USER" "$PHP" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> 3/5  Migrations base de données"
 sudo -u "$WEB_USER" "$PHP" bin/console d:s:u --force --no-interaction --env=prod
