@@ -14,9 +14,12 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Entity\Box\BlogBox;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
+#[ORM\UniqueConstraint(name: 'uniq_article_box_slug', columns: ['blog_box_id', 'slug'])]
+#[UniqueEntity(fields: ['blogBox', 'slug'], errorPath: 'slug', message: 'Un article avec ce slug existe déjà dans ce blog.')]
 #[ApiResource(
     normalizationContext: ['groups' => ['article:read']],
     denormalizationContext: ['groups' => ['article:write']],

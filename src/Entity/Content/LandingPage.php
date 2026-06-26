@@ -7,9 +7,12 @@ use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use App\Entity\Box\Box;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
+#[ORM\UniqueConstraint(name: 'uniq_landing_box_slug_locale', columns: ['box_id', 'slug', 'locale'])]
+#[UniqueEntity(fields: ['box', 'slug', 'locale'], errorPath: 'slug', message: 'Une landing page avec ce slug existe déjà pour cette box et cette langue.')]
 #[ApiResource(
     normalizationContext: ['groups' => ['content:read']],
     denormalizationContext: ['groups' => ['content:write']],
