@@ -49,6 +49,10 @@ class BusinessBox extends Box
     #[Groups(['box:read', 'box:write'])]
     private ?TravelBox $travelBox = null;
 
+    #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'childBusinessBoxes')]
+    #[Groups(['box:read', 'box:write'])]
+    private ?BusinessBox $parentBusinessBox = null;
+
     /** @var Collection<int, StoreBox> */
     #[ORM\OneToMany(mappedBy: 'businessBox', targetEntity: StoreBox::class)]
     private Collection $storeBoxes;
@@ -57,11 +61,21 @@ class BusinessBox extends Box
     #[ORM\OneToMany(mappedBy: 'businessBox', targetEntity: BlogBox::class)]
     private Collection $blogBoxes;
 
+    /** @var Collection<int, TravelBox> */
+    #[ORM\OneToMany(mappedBy: 'businessBox', targetEntity: TravelBox::class)]
+    private Collection $travelBoxes;
+
+    /** @var Collection<int, BusinessBox> */
+    #[ORM\OneToMany(mappedBy: 'parentBusinessBox', targetEntity: BusinessBox::class)]
+    private Collection $childBusinessBoxes;
+
     public function __construct()
     {
         parent::__construct();
         $this->storeBoxes = new ArrayCollection();
         $this->blogBoxes = new ArrayCollection();
+        $this->travelBoxes = new ArrayCollection();
+        $this->childBusinessBoxes = new ArrayCollection();
     }
 
     public function getType(): string { return self::TYPE_BUSINESS; }
@@ -71,8 +85,16 @@ class BusinessBox extends Box
     public function setWebsite(?string $website): self { $this->website = $website; return $this; }
     public function getTravelBox(): ?TravelBox { return $this->travelBox; }
     public function setTravelBox(?TravelBox $travelBox): self { $this->travelBox = $travelBox; return $this; }
+    public function getParentBusinessBox(): ?BusinessBox { return $this->parentBusinessBox; }
+    public function setParentBusinessBox(?BusinessBox $parentBusinessBox): self { $this->parentBusinessBox = $parentBusinessBox; return $this; }
     /** @return Collection<int, StoreBox> */
     public function getStoreBoxes(): Collection { return $this->storeBoxes; }
     /** @return Collection<int, BlogBox> */
     public function getBlogBoxes(): Collection { return $this->blogBoxes; }
+    /** @return Collection<int, TravelBox> */
+    public function getTravelBoxes(): Collection { return $this->travelBoxes; }
+    /** @return Collection<int, BusinessBox> */
+    public function getChildBusinessBoxes(): Collection { return $this->childBusinessBoxes; }
+
+    public function getParentBox(): ?Box { return $this->travelBox ?? $this->parentBusinessBox; }
 }

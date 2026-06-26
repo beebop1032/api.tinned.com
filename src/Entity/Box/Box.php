@@ -78,6 +78,9 @@ abstract class Box
 
     abstract public function getType(): string;
 
+    /** Le parent unique de ce box dans la hiérarchie, ou null si racine. */
+    abstract public function getParentBox(): ?Box;
+
     public function getId(): ?int { return $this->id; }
     public function getName(): string { return $this->name; }
     public function setName(string $name): static { $this->name = $name; return $this; }

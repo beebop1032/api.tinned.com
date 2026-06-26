@@ -39,28 +39,32 @@ use Symfony\Component\Serializer\Annotation\Groups;
 class StoreBox extends Box
 {
     #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'storeBoxes')]
+    #[ORM\JoinColumn(nullable: false)]
     #[Groups(['box:read', 'box:write', 'product:read'])]
     private ?BusinessBox $businessBox = null;
-
-    #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'storeBoxes')]
-    #[Groups(['box:read', 'box:write', 'product:read'])]
-    private ?TravelBox $travelBox = null;
 
     /** @var Collection<int, Product> */
     #[ORM\OneToMany(mappedBy: 'storeBox', targetEntity: Product::class)]
     private Collection $products;
 
+    /** @var Collection<int, BlogBox> */
+    #[ORM\OneToMany(mappedBy: 'storeBox', targetEntity: BlogBox::class)]
+    private Collection $blogBoxes;
+
     public function __construct()
     {
         parent::__construct();
         $this->products = new ArrayCollection();
+        $this->blogBoxes = new ArrayCollection();
     }
 
     public function getType(): string { return self::TYPE_STORE; }
     public function getBusinessBox(): ?BusinessBox { return $this->businessBox; }
     public function setBusinessBox(?BusinessBox $businessBox): self { $this->businessBox = $businessBox; return $this; }
-    public function getTravelBox(): ?TravelBox { return $this->travelBox; }
-    public function setTravelBox(?TravelBox $travelBox): self { $this->travelBox = $travelBox; return $this; }
     /** @return Collection<int, Product> */
     public function getProducts(): Collection { return $this->products; }
+    /** @return Collection<int, BlogBox> */
+    public function getBlogBoxes(): Collection { return $this->blogBoxes; }
+
+    public function getParentBox(): ?Box { return $this->businessBox; }
 }

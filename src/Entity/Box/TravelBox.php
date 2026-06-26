@@ -38,14 +38,22 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'name' => 'partial'])]
 class TravelBox extends Box
 {
+    #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'childTravelBoxes')]
+    #[Groups(['box:read', 'box:write'])]
+    private ?TravelBox $parentTravelBox = null;
+
+    #[ORM\ManyToOne(targetEntity: BusinessBox::class, inversedBy: 'travelBoxes')]
+    #[Groups(['box:read', 'box:write'])]
+    private ?BusinessBox $businessBox = null;
+
     /** @var Collection<int, Trip> */
     #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: Trip::class)]
     #[Groups(['box:read'])]
     private Collection $trips;
 
-    /** @var Collection<int, StoreBox> */
-    #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: StoreBox::class)]
-    private Collection $storeBoxes;
+    /** @var Collection<int, TravelBox> */
+    #[ORM\OneToMany(mappedBy: 'parentTravelBox', targetEntity: TravelBox::class)]
+    private Collection $childTravelBoxes;
 
     /** @var Collection<int, BusinessBox> */
     #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: BusinessBox::class)]
@@ -59,22 +67,28 @@ class TravelBox extends Box
     {
         parent::__construct();
         $this->trips = new ArrayCollection();
-        $this->storeBoxes = new ArrayCollection();
+        $this->childTravelBoxes = new ArrayCollection();
         $this->businessBoxes = new ArrayCollection();
         $this->blogBoxes = new ArrayCollection();
     }
 
     public function getType(): string { return self::TYPE_TRAVEL; }
 
+    public function getParentTravelBox(): ?TravelBox { return $this->parentTravelBox; }
+    public function setParentTravelBox(?TravelBox $parentTravelBox): self { $this->parentTravelBox = $parentTravelBox; return $this; }
+    public function getBusinessBox(): ?BusinessBox { return $this->businessBox; }
+    public function setBusinessBox(?BusinessBox $businessBox): self { $this->businessBox = $businessBox; return $this; }
+
     /** @return Collection<int, Trip> */
     public function getTrips(): Collection { return $this->trips; }
-
-    /** @return Collection<int, StoreBox> */
-    public function getStoreBoxes(): Collection { return $this->storeBoxes; }
+    /** @return Collection<int, TravelBox> */
+    public function getChildTravelBoxes(): Collection { return $this->childTravelBoxes; }
     /** @return Collection<int, BusinessBox> */
     public function getBusinessBoxes(): Collection { return $this->businessBoxes; }
     /** @return Collection<int, BlogBox> */
     public function getBlogBoxes(): Collection { return $this->blogBoxes; }
+
+    public function getParentBox(): ?Box { return $this->parentTravelBox ?? $this->businessBox; }
 
     public function addTrip(Trip $trip): self
     {

@@ -42,7 +42,7 @@ class BlogBox extends Box
     #[Groups(['box:read', 'box:write', 'article:read'])]
     private ?BusinessBox $businessBox = null;
 
-    #[ORM\ManyToOne(targetEntity: StoreBox::class)]
+    #[ORM\ManyToOne(targetEntity: StoreBox::class, inversedBy: 'blogBoxes')]
     #[Groups(['box:read', 'box:write', 'article:read'])]
     private ?StoreBox $storeBox = null;
 
@@ -69,4 +69,6 @@ class BlogBox extends Box
     public function setTravelBox(?TravelBox $travelBox): self { $this->travelBox = $travelBox; return $this; }
     /** @return Collection<int, Article> */
     public function getArticles(): Collection { return $this->articles; }
+
+    public function getParentBox(): ?Box { return $this->travelBox ?? $this->businessBox ?? $this->storeBox; }
 }
