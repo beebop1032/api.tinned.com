@@ -42,6 +42,10 @@ class StoreBox extends Box
     #[Groups(['box:read', 'box:write', 'product:read'])]
     private ?BusinessBox $businessBox = null;
 
+    #[ORM\ManyToOne(targetEntity: TravelBox::class, inversedBy: 'storeBoxes')]
+    #[Groups(['box:read', 'box:write', 'product:read'])]
+    private ?TravelBox $travelBox = null;
+
     /** @var Collection<int, Product> */
     #[ORM\OneToMany(mappedBy: 'storeBox', targetEntity: Product::class)]
     private Collection $products;
@@ -55,6 +59,8 @@ class StoreBox extends Box
     public function getType(): string { return self::TYPE_STORE; }
     public function getBusinessBox(): ?BusinessBox { return $this->businessBox; }
     public function setBusinessBox(?BusinessBox $businessBox): self { $this->businessBox = $businessBox; return $this; }
+    public function getTravelBox(): ?TravelBox { return $this->travelBox; }
+    public function setTravelBox(?TravelBox $travelBox): self { $this->travelBox = $travelBox; return $this; }
     /** @return Collection<int, Product> */
     public function getProducts(): Collection { return $this->products; }
 }

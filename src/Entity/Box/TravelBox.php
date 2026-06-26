@@ -43,16 +43,38 @@ class TravelBox extends Box
     #[Groups(['box:read'])]
     private Collection $trips;
 
+    /** @var Collection<int, StoreBox> */
+    #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: StoreBox::class)]
+    private Collection $storeBoxes;
+
+    /** @var Collection<int, BusinessBox> */
+    #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: BusinessBox::class)]
+    private Collection $businessBoxes;
+
+    /** @var Collection<int, BlogBox> */
+    #[ORM\OneToMany(mappedBy: 'travelBox', targetEntity: BlogBox::class)]
+    private Collection $blogBoxes;
+
     public function __construct()
     {
         parent::__construct();
         $this->trips = new ArrayCollection();
+        $this->storeBoxes = new ArrayCollection();
+        $this->businessBoxes = new ArrayCollection();
+        $this->blogBoxes = new ArrayCollection();
     }
 
     public function getType(): string { return self::TYPE_TRAVEL; }
 
     /** @return Collection<int, Trip> */
     public function getTrips(): Collection { return $this->trips; }
+
+    /** @return Collection<int, StoreBox> */
+    public function getStoreBoxes(): Collection { return $this->storeBoxes; }
+    /** @return Collection<int, BusinessBox> */
+    public function getBusinessBoxes(): Collection { return $this->businessBoxes; }
+    /** @return Collection<int, BlogBox> */
+    public function getBlogBoxes(): Collection { return $this->blogBoxes; }
 
     public function addTrip(Trip $trip): self
     {
