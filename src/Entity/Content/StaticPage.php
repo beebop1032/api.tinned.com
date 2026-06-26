@@ -6,9 +6,12 @@ use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
+#[ORM\UniqueConstraint(name: 'uniq_static_slug_locale', columns: ['slug', 'locale'])]
+#[UniqueEntity(fields: ['slug', 'locale'], errorPath: 'slug', message: 'Une page statique avec ce slug existe déjà pour cette langue.')]
 #[ApiResource(
     normalizationContext: ['groups' => ['content:read']],
     denormalizationContext: ['groups' => ['content:write']],

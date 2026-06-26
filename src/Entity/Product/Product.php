@@ -17,9 +17,12 @@ use App\Entity\Box\StoreBox;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
+#[ORM\UniqueConstraint(name: 'uniq_product_box_slug', columns: ['store_box_id', 'slug'])]
+#[UniqueEntity(fields: ['storeBox', 'slug'], errorPath: 'slug', message: 'Un produit avec ce slug existe déjà dans cette boutique.')]
 #[ApiResource(
     normalizationContext: ['groups' => ['product:read']],
     denormalizationContext: ['groups' => ['product:write']],

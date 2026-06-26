@@ -14,9 +14,12 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Entity\Box\TravelBox;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
+#[ORM\UniqueConstraint(name: 'uniq_trip_box_slug_locale', columns: ['travel_box_id', 'slug', 'locale'])]
+#[UniqueEntity(fields: ['travelBox', 'slug', 'locale'], errorPath: 'slug', message: 'Un carnet avec ce slug existe déjà dans cette TravelBox pour cette langue.')]
 #[ApiResource(
     normalizationContext: ['groups' => ['trip:read']],
     denormalizationContext: ['groups' => ['trip:write']],
