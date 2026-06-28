@@ -27,38 +27,42 @@ class ValidBlocksValidator extends ConstraintValidator
 
         foreach ($value as $i => $block) {
             if (!is_array($block)) {
-                $this->violation("[$i] : chaque bloc doit être un objet.");
+                $this->violation('Chaque bloc doit être un objet.', "[$i]");
                 continue;
             }
 
             $id = $block['id'] ?? null;
             if (!is_string($id) || $id === '') {
-                $this->violation("[$i].id : identifiant de bloc requis (string non vide).");
+                $this->violation('Identifiant de bloc requis (string non vide).', "[$i].id");
             }
 
             $type = $block['type'] ?? null;
             if (!is_string($type) || !BlockCatalog::isType($type)) {
-                $this->violation("[$i].type : type inconnu (attendu : " . implode(', ', BlockCatalog::types()) . ').');
+                $this->violation('Type inconnu (attendu : ' . implode(', ', BlockCatalog::types()) . ').', "[$i].type");
                 continue;
             }
 
             foreach (BlockCatalog::requiredFields($type) as $field) {
                 if (!isset($block[$field]) || $block[$field] === '' || $block[$field] === []) {
-                    $this->violation("[$i].$field : champ requis pour le bloc « $type ».");
+                    $this->violation("Champ requis pour le bloc « $type ».", "[$i].$field");
                 }
             }
 
             if ($type === 'collection') {
                 $source = $block['source'] ?? null;
-                if (!in_array($source, BlockCatalog::COLLECTION_SOURCES, true)) {
-                    $this->violation("[$i].source : source invalide (attendu : " . implode(', ', BlockCatalog::COLLECTION_SOURCES) . ').');
+                if ($source !== null && !in_array($source, BlockCatalog::COLLECTION_SOURCES, true)) {
+                    $this->violation('Source invalide (attendu : ' . implode(', ', BlockCatalog::COLLECTION_SOURCES) . ').', "[$i].source");
                 }
             }
         }
     }
 
-    private function violation(string $message): void
+    private function violation(string $message, string $path = ''): void
     {
-        $this->context->buildViolation($message)->addViolation();
+        $builder = $this->context->buildViolation($message);
+        if ($path !== '') {
+            $builder->atPath($path);
+        }
+        $builder->addViolation();
     }
 }
