@@ -1,0 +1,28 @@
+[
+  {
+    "id": "b_hero",
+    "type": "hero",
+    "title": "Casa do Sul",
+    "subtitle": "Céramiques artisanales du sud du Portugal",
+    "imagePath": "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1600&q=80",
+    "cta": { "label": "Voir la boutique", "href": "#products" }
+  },
+  {
+    "id": "b_intro",
+    "type": "richText",
+    "markdown": "## Un artisanat vivant\n\nChaque assiette, chaque bol est façonné à la main et émaillé selon des recettes transmises de génération en génération."
+  },
+  {
+    "id": "b_products",
+    "type": "collection",
+    "source": "products",
+    "title": "Notre sélection",
+    "limit": 6
+  },
+  {
+    "id": "b_cta",
+    "type": "cta",
+    "heading": "Restez informé",
+    "button": { "label": "S'inscrire à la newsletter", "href": "#newsletter" }
+  }
+]
