@@ -4,6 +4,7 @@ namespace App\Entity\Content;
 
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -46,6 +47,9 @@ class LandingPage
 
     #[ORM\ManyToOne(targetEntity: Box::class)]
     #[ORM\JoinColumn(nullable: false)]
+    // Box est abstraite (non-resource) ; sans ceci API Platform tente d'instancier Box
+    // au lieu de résoudre l'IRI -> "Cannot instantiate abstract class". On force l'IRI.
+    #[ApiProperty(readableLink: false, writableLink: false)]
     #[Assert\NotNull(message: 'Une landing page doit être rattachée à une box.')]
     #[Groups(['content:read', 'content:write'])]
     private ?Box $box = null;
