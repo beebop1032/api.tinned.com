@@ -2,12 +2,17 @@
 
 namespace App\Entity\Box;
 
+use ApiPlatform\Metadata\ApiResource;
 use App\Entity\User;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
+// Resource sans opération : aucune route /api/boxes, mais Box est enregistrée comme
+// resource pour que les relations typées Box (ex. LandingPage.box) résolvent l'IRI
+// concret (/api/store_boxes/2 -> StoreBox) au lieu d'instancier la classe abstraite.
+#[ApiResource(operations: [])]
 #[ORM\Entity]
 #[ORM\InheritanceType('JOINED')]
 #[ORM\DiscriminatorColumn(name: 'box_type', type: 'string')]
