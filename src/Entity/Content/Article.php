@@ -33,7 +33,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
     ],
 )]
 #[ApiFilter(BooleanFilter::class, properties: ['published'])]
-#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'title' => 'partial', 'blogBox.slug' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'title' => 'partial', 'blogBox.slug' => 'exact', 'blogBox.id' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['publishedAt', 'title'])]
 class Article
 {
