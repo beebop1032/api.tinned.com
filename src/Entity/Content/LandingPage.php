@@ -2,6 +2,7 @@
 
 namespace App\Entity\Content;
 
+use ApiPlatform\Doctrine\Orm\Filter\ExistsFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiProperty;
@@ -35,6 +36,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     ],
 )]
 #[ApiFilter(SearchFilter::class, properties: ['box.slug' => 'exact', 'slug' => 'exact', 'locale' => 'exact'])]
+#[ApiFilter(ExistsFilter::class, properties: ['box'])]
 class LandingPage
 {
     #[ORM\Id]
