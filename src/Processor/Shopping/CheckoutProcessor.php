@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Entity\Delivery\DeliveryMethod;
 use App\Entity\Product\ProductVariant;
+use App\Entity\Product\StockMovement;
 use App\Entity\Shopping\Coupon;
 use App\Entity\Shopping\CustomerOrder;
 use App\Entity\Shopping\OrderLine;
@@ -137,6 +138,7 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 $variant = $storeLine['variant'];
                 $quantity = (int) $storeLine['quantity'];
                 $variant->setStock($variant->getStock() - $quantity);
+                $this->logSaleMovement($variant, $quantity, $storeOrder->getStoreBox()?->getSlug());
 
                 $line = (new OrderLine())
                     ->setVariant($variant)
@@ -294,6 +296,27 @@ readonly class CheckoutProcessor implements ProcessorInterface
         $order->setDiscountCents($coupon->discountFor($order->getSubtotalCents()));
         $order->setCouponCode($coupon->getCode());
         $coupon->incrementUsedCount();
+    }
+
+    /**
+     * Records a `sale` stock movement for the just-decremented variant. The
+     * stock is already updated by the caller, so this only snapshots it — it
+     * never re-applies the delta. Wrapped in a try/catch so a logging failure
+     * can never break an otherwise valid checkout.
+     */
+    private function logSaleMovement(ProductVariant $variant, int $quantity, ?string $storeSlug): void
+    {
+        try {
+            $movement = (new StockMovement())
+                ->setVariant($variant)
+                ->setDelta(-$quantity)
+                ->setReason('sale')
+                ->setResultingStock($variant->getStock())
+                ->setNote($storeSlug ? sprintf('Vente boutique %s', $storeSlug) : null);
+            $this->em->persist($movement);
+        } catch (\Throwable) {
+            // Stock-movement logging is additive; never let it break a checkout.
+        }
     }
 
     private function fail(string $path, string $message): never
