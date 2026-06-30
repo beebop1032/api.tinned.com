@@ -28,6 +28,12 @@ class SubscriptionProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Expected a Subscription.');
         }
 
+        // Authenticated subscriber: the account email is authoritative — never trust a
+        // client-posted placeholder (also keeps dedup correct across different users).
+        $authUser = $this->security->getUser();
+        if ($authUser instanceof User && $authUser->getEmail()) {
+            $data->setEmail($authUser->getEmail());
+        }
         $data->setEmail(strtolower(trim($data->getEmail())));
 
         // Dedup: reuse an existing, non-unsubscribed subscription for the same target.
