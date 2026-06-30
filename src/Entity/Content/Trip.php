@@ -33,7 +33,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
     ],
 )]
 #[ApiFilter(BooleanFilter::class, properties: ['published'])]
-#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'travelBox.slug' => 'exact', 'locale' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'travelBox.id' => 'exact', 'travelBox.slug' => 'exact', 'locale' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['publishedAt'])]
 class Trip
 {
