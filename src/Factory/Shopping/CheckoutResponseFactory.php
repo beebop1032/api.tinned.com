@@ -74,6 +74,8 @@ class CheckoutResponseFactory
             address: $addressPayload,
             subtotalCents: $order->getSubtotalCents(),
             shippingCents: $order->getShippingCents(),
+            discountCents: $order->getDiscountCents(),
+            couponCode: $order->getCouponCode(),
             totalCents: $order->getTotalCents(),
             currency: $order->getCurrency(),
             createdAt: $order->getCreatedAt()->format(\DateTimeInterface::ATOM),

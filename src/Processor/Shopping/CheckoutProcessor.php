@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Entity\Delivery\DeliveryMethod;
 use App\Entity\Product\ProductVariant;
+use App\Entity\Shopping\Coupon;
 use App\Entity\Shopping\CustomerOrder;
 use App\Entity\Shopping\OrderLine;
 use App\Entity\Shopping\StoreOrder;
@@ -149,6 +150,7 @@ readonly class CheckoutProcessor implements ProcessorInterface
         }
 
         $order->recalculateTotals();
+        $this->applyCoupon($order, $data->couponCode);
         $this->em->flush();
 
         $checkoutUrl = '';
@@ -268,6 +270,30 @@ readonly class CheckoutProcessor implements ProcessorInterface
         }
 
         return $availableDeliveryMethods[0];
+    }
+
+    /**
+     * Applies an optional promo code to the order. When the code is empty or
+     * invalid the order keeps a discount of 0 and behaves exactly as before.
+     */
+    private function applyCoupon(CustomerOrder $order, ?string $rawCode): void
+    {
+        $code = strtoupper(trim((string) $rawCode));
+        if ($code === '') {
+            return;
+        }
+
+        $coupon = $this->em->getRepository(Coupon::class)->findOneBy(['code' => $code]);
+        if (!$coupon instanceof Coupon
+            || !$coupon->isValidNow()
+            || $order->getSubtotalCents() < $coupon->getMinSubtotalCents()
+        ) {
+            return;
+        }
+
+        $order->setDiscountCents($coupon->discountFor($order->getSubtotalCents()));
+        $order->setCouponCode($coupon->getCode());
+        $coupon->incrementUsedCount();
     }
 
     private function fail(string $path, string $message): never

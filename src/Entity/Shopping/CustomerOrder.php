@@ -86,6 +86,14 @@ class CustomerOrder
     #[Groups(['order:read', 'order:write'])]
     private ?string $molliePaymentId = null;
 
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['order:read'])]
+    private int $discountCents = 0;
+
+    #[ORM\Column(length: 40, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $couponCode = null;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private int $totalCents = 0;
@@ -135,9 +143,13 @@ class CustomerOrder
         return $this->recalculateTotals();
     }
     public function getSubtotalCents(): int { return $this->subtotalCents; }
-    public function setSubtotalCents(int $subtotalCents): self { $this->subtotalCents = max(0, $subtotalCents); $this->totalCents = $this->subtotalCents + $this->shippingCents; return $this; }
+    public function setSubtotalCents(int $subtotalCents): self { $this->subtotalCents = max(0, $subtotalCents); $this->totalCents = $this->computeTotal(); return $this; }
     public function getShippingCents(): int { return $this->shippingCents; }
-    public function setShippingCents(int $shippingCents): self { $this->shippingCents = max(0, $shippingCents); $this->totalCents = $this->subtotalCents + $this->shippingCents; return $this; }
+    public function setShippingCents(int $shippingCents): self { $this->shippingCents = max(0, $shippingCents); $this->totalCents = $this->computeTotal(); return $this; }
+    public function getDiscountCents(): int { return $this->discountCents; }
+    public function setDiscountCents(int $discountCents): self { $this->discountCents = max(0, $discountCents); $this->totalCents = $this->computeTotal(); return $this; }
+    public function getCouponCode(): ?string { return $this->couponCode; }
+    public function setCouponCode(?string $couponCode): self { $this->couponCode = $couponCode; return $this; }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
     public function getPaymentStatus(): string { return $this->paymentStatus; }
@@ -166,7 +178,12 @@ class CustomerOrder
                 $this->subtotalCents += $line->getLineTotalCents();
             }
         }
-        $this->totalCents = $this->subtotalCents + $this->shippingCents;
+        $this->totalCents = $this->computeTotal();
         return $this;
+    }
+
+    private function computeTotal(): int
+    {
+        return max(0, $this->subtotalCents - $this->discountCents) + $this->shippingCents;
     }
 }

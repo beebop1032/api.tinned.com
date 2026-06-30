@@ -25,6 +25,8 @@ class CheckoutResponse
         public array $address,
         public int $subtotalCents,
         public int $shippingCents,
+        public int $discountCents,
+        public ?string $couponCode,
         public int $totalCents,
         public string $currency,
         public string $createdAt,

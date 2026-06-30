@@ -34,4 +34,6 @@ class CheckoutRequest
 
     #[Assert\NotBlank]
     public string $paymentMethod = 'card';
+
+    public ?string $couponCode = null;
 }
