@@ -18,9 +18,11 @@ use App\Factory\Shopping\CheckoutResponseFactory;
 use App\Model\Shopping\CheckoutRequest;
 use App\Model\Shopping\CheckoutResponse;
 use App\Service\Payment\MollieService;
+use App\Service\Shopping\OrderInventoryReleaser;
+use App\Service\Shopping\OrderMailer;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 
@@ -33,6 +35,8 @@ readonly class CheckoutProcessor implements ProcessorInterface
         private Security $security,
         private CheckoutResponseFactory $responseFactory,
         private MollieService $mollieService,
+        private OrderInventoryReleaser $inventoryReleaser,
+        private OrderMailer $orderMailer,
     ) {}
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): CheckoutResponse
@@ -41,9 +45,10 @@ readonly class CheckoutProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Invalid checkout payload.');
         }
 
+        // Logged-in buyer, or a guest resolved/created from the provided email.
         $user = $this->security->getUser();
         if (!$user instanceof User) {
-            throw new AccessDeniedException('Authentication is required to create an order.');
+            $user = $this->resolveGuestUser($data);
         }
 
         if (!in_array($data->paymentMethod, self::PAYMENT_METHODS, true)) {
@@ -124,55 +129,111 @@ readonly class CheckoutProcessor implements ProcessorInterface
             ->setPaymentStatus('pending')
             ->setPaymentMethod($data->paymentMethod);
 
-        $this->em->persist($address);
-        $this->em->persist($order);
+        // Reserve stock atomically: a single transaction with a row lock per variant
+        // prevents two concurrent checkouts from overselling the same units.
+        $this->em->beginTransaction();
+        try {
+            $this->em->persist($address);
+            $this->em->persist($order);
 
-        foreach ($stores as $storeSlug => $storeData) {
-            $carrier = $this->deliveryMethodFor($carrierByStore[$storeSlug] ?? null, $availableDeliveryMethods);
-            $shippingCents = $carrier->priceFor((int) $storeData['subtotalCents']);
+            foreach ($stores as $storeSlug => $storeData) {
+                $carrier = $this->deliveryMethodFor($carrierByStore[$storeSlug] ?? null, $availableDeliveryMethods);
+                $shippingCents = $carrier->priceFor((int) $storeData['subtotalCents']);
 
-            $storeOrder = (new StoreOrder())
-                ->setStoreBox($storeData['storeBox'])
-                ->setCarrierCode($carrier->getCode())
-                ->setCarrierNameSnapshot($carrier->getName())
-                ->setDeliveryMode($carrier->getMethod())
-                ->setCurrency($storeData['currency']);
+                $storeOrder = (new StoreOrder())
+                    ->setStoreBox($storeData['storeBox'])
+                    ->setCarrierCode($carrier->getCode())
+                    ->setCarrierNameSnapshot($carrier->getName())
+                    ->setDeliveryMode($carrier->getMethod())
+                    ->setCurrency($storeData['currency']);
 
-            $order->addStoreOrder($storeOrder);
+                $order->addStoreOrder($storeOrder);
 
-            foreach ($storeData['lines'] as $storeLine) {
-                /** @var ProductVariant $variant */
-                $variant = $storeLine['variant'];
-                $quantity = (int) $storeLine['quantity'];
-                // Pre-orders may exceed available stock; clamp at 0 so stock never goes negative.
-                $variant->setStock(max(0, $variant->getStock() - $quantity));
-                $this->logSaleMovement($variant, $quantity, $storeOrder->getStoreBox()?->getSlug());
+                foreach ($storeData['lines'] as $storeLine) {
+                    /** @var ProductVariant $variant */
+                    $variant = $storeLine['variant'];
+                    $quantity = (int) $storeLine['quantity'];
 
-                $line = (new OrderLine())
-                    ->setVariant($variant)
-                    ->setQuantity($quantity);
-                $storeOrder->addLine($line);
-                $order->addLine($line);
+                    // Lock the row, then re-check stock against the locked value so the
+                    // guard holds under concurrency (the earlier check is only fail-fast).
+                    $this->em->lock($variant, LockMode::PESSIMISTIC_WRITE);
+                    $isPreorder = $variant->getProduct()?->getAvailability() === 'preorder';
+                    if (!$isPreorder && $variant->getStock() < $quantity) {
+                        $this->fail('items', sprintf('Only %d item(s) left for %s.', $variant->getStock(), $variant->getSku()));
+                    }
+
+                    // Pre-orders may exceed available stock; clamp at 0 so stock never goes
+                    // negative. Record what was actually removed so it can be given back exactly.
+                    $before = $variant->getStock();
+                    $variant->setStock(max(0, $before - $quantity));
+                    $reserved = $before - $variant->getStock();
+                    $this->logSaleMovement($variant, $reserved, $storeOrder->getStoreBox()?->getSlug());
+
+                    $line = (new OrderLine())
+                        ->setVariant($variant)
+                        ->setQuantity($quantity)
+                        ->setStockReserved($reserved);
+                    $storeOrder->addLine($line);
+                    $order->addLine($line);
+                }
+
+                $storeOrder->setShippingCents($shippingCents);
+                $this->em->persist($storeOrder);
             }
 
-            $storeOrder->setShippingCents($shippingCents);
-            $this->em->persist($storeOrder);
+            $order->recalculateTotals();
+            $this->applyCoupon($order, $data->couponCode);
+            $this->em->flush();
+            $this->em->commit();
+        } catch (\Throwable $e) {
+            $this->em->rollback();
+            throw $e;
         }
-
-        $order->recalculateTotals();
-        $this->applyCoupon($order, $data->couponCode);
-        $this->em->flush();
 
         $checkoutUrl = '';
         try {
             $checkoutUrl = $this->mollieService->createPayment($order);
         } catch (\Throwable) {
+            // Payment could not be initiated: cancel and give the reserved stock/coupon back.
             $order->setStatus(CustomerOrder::STATUS_CANCELLED);
+            $this->inventoryReleaser->release($order);
             $this->em->flush();
             $this->fail('payment', 'Payment service is temporarily unavailable. Please try again.');
         }
 
+        // Order received (payment still pending). Best-effort: never blocks the response.
+        $this->orderMailer->sendOrderReceived($order);
+
         return $this->responseFactory->fromOrder($order, $checkoutUrl);
+    }
+
+    /**
+     * Resolves the buyer for a guest (unauthenticated) checkout: reuses the account that
+     * already owns this email, or creates a passwordless guest the buyer can later claim
+     * by setting a password. The random password placeholder can never authenticate.
+     */
+    private function resolveGuestUser(CheckoutRequest $data): User
+    {
+        $email = strtolower(trim($data->email));
+        if ($email === '') {
+            $this->fail('email', 'A valid email is required to place an order.');
+        }
+
+        $existing = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+        if ($existing instanceof User) {
+            return $existing;
+        }
+
+        $user = (new User())
+            ->setEmail($email)
+            ->setFirstName($data->firstName)
+            ->setLastName($data->lastName)
+            ->setPhone($data->phone);
+        $user->setRoles(['ROLE_USER']);
+        $user->setPassword(bin2hex(random_bytes(16)));
+        $this->em->persist($user);
+
+        return $user;
     }
 
     /**

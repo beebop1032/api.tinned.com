@@ -4,6 +4,8 @@ namespace App\Service\Payment;
 
 use App\Entity\Shopping\CustomerOrder;
 use App\Entity\Shopping\StoreOrder;
+use App\Service\Shopping\OrderInventoryReleaser;
+use App\Service\Shopping\OrderMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Mollie\Api\MollieApiClient;
 
@@ -16,6 +18,8 @@ class MollieService
         private string $redirectUrl,
         private string $webhookUrl,
         private EntityManagerInterface $em,
+        private OrderInventoryReleaser $inventoryReleaser,
+        private OrderMailer $orderMailer,
     ) {
         $this->mollie = new MollieApiClient();
         $this->mollie->setApiKey($this->apiKey);
@@ -76,12 +80,33 @@ class MollieService
         $order->setPaymentStatus($payment->status);
 
         if ($payment->isPaid()) {
-            $order->setStatus(CustomerOrder::STATUS_PAID);
-            foreach ($order->getStoreOrders() as $storeOrder) {
-                $storeOrder->setStatus(StoreOrder::STATUS_WAITING_STORE);
+            // Only advance once: a replayed webhook must not reset store orders that the
+            // seller has already moved to preparing/shipped.
+            if ($order->getStatus() !== CustomerOrder::STATUS_PAID) {
+                $order->setStatus(CustomerOrder::STATUS_PAID);
+                foreach ($order->getStoreOrders() as $storeOrder) {
+                    if ($storeOrder->getStatus() === StoreOrder::STATUS_OPEN) {
+                        $storeOrder->setStatus(StoreOrder::STATUS_WAITING_STORE);
+                    }
+                    // Notify each store owner of the new payable order.
+                    $this->orderMailer->sendNewOrderToSeller($storeOrder);
+                }
+                // Payment receipt to the buyer.
+                $this->orderMailer->sendPaymentReceipt($order);
             }
         } elseif ($payment->isFailed() || $payment->isExpired() || $payment->isCanceled()) {
-            $order->setStatus(CustomerOrder::STATUS_CANCELLED);
+            // Never cancel (or re-release) an order that has already been paid, e.g. an
+            // out-of-order or duplicate webhook delivery.
+            if ($order->getStatus() !== CustomerOrder::STATUS_PAID) {
+                $order->setStatus(CustomerOrder::STATUS_CANCELLED);
+                foreach ($order->getStoreOrders() as $storeOrder) {
+                    if (!in_array($storeOrder->getStatus(), [StoreOrder::STATUS_SHIPPED, StoreOrder::STATUS_COMPLETED], true)) {
+                        $storeOrder->setStatus(StoreOrder::STATUS_CANCELLED);
+                    }
+                }
+                // Idempotent (guarded by CustomerOrder::inventoryReleased).
+                $this->inventoryReleaser->release($order);
+            }
         }
 
         $this->em->flush();

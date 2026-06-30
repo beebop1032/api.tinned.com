@@ -113,6 +113,7 @@ class Coupon
     public function getUsedCount(): int { return $this->usedCount; }
     public function setUsedCount(int $usedCount): self { $this->usedCount = $usedCount; return $this; }
     public function incrementUsedCount(): self { $this->usedCount++; return $this; }
+    public function decrementUsedCount(): self { $this->usedCount = max(0, $this->usedCount - 1); return $this; }
     public function getMinSubtotalCents(): int { return $this->minSubtotalCents; }
     public function setMinSubtotalCents(int $minSubtotalCents): self { $this->minSubtotalCents = max(0, $minSubtotalCents); return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }

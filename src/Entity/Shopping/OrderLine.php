@@ -59,7 +59,17 @@ class OrderLine
     #[Groups(['order:read', 'order:write'])]
     private int $quantity = 1;
 
+    /**
+     * Units actually removed from the variant stock at checkout. Equals quantity for
+     * in-stock items, but is smaller for pre-orders whose stock was clamped at 0 —
+     * so restitution credits back exactly what was taken, never inflating stock.
+     */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $stockReserved = 0;
+
     public function getId(): ?int { return $this->id; }
+    public function getStockReserved(): int { return $this->stockReserved; }
+    public function setStockReserved(int $stockReserved): self { $this->stockReserved = max(0, $stockReserved); return $this; }
     public function getCustomerOrder(): ?CustomerOrder { return $this->customerOrder; }
     public function setCustomerOrder(?CustomerOrder $customerOrder): self { $this->customerOrder = $customerOrder; return $this; }
     public function getStoreOrder(): ?StoreOrder { return $this->storeOrder; }

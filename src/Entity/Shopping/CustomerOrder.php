@@ -94,6 +94,14 @@ class CustomerOrder
     #[Groups(['order:read'])]
     private ?string $couponCode = null;
 
+    /**
+     * True once the stock + coupon usage reserved at checkout have been given back
+     * (payment failed/expired/cancelled). Guards against double restitution when the
+     * Mollie webhook is replayed.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $inventoryReleased = false;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private int $totalCents = 0;
@@ -150,6 +158,8 @@ class CustomerOrder
     public function setDiscountCents(int $discountCents): self { $this->discountCents = max(0, $discountCents); $this->totalCents = $this->computeTotal(); return $this; }
     public function getCouponCode(): ?string { return $this->couponCode; }
     public function setCouponCode(?string $couponCode): self { $this->couponCode = $couponCode; return $this; }
+    public function isInventoryReleased(): bool { return $this->inventoryReleased; }
+    public function setInventoryReleased(bool $inventoryReleased): self { $this->inventoryReleased = $inventoryReleased; return $this; }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
     public function getPaymentStatus(): string { return $this->paymentStatus; }

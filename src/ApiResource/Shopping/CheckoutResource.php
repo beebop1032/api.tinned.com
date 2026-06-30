@@ -12,8 +12,9 @@ use App\Processor\Shopping\CheckoutProcessor;
     shortName: 'Checkout',
     operations: [
         new Post(
+            // Public: guest checkout is allowed. The processor resolves a logged-in user
+            // or creates/reuses a guest account from the provided email.
             uriTemplate: '/checkout',
-            security: "is_granted('ROLE_USER')",
             input: CheckoutRequest::class,
             output: CheckoutResponse::class,
             processor: CheckoutProcessor::class,

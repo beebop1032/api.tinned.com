@@ -56,6 +56,12 @@ class ResendMailer
         return $this->send($s->getEmail(), 'Bienvenue chez Tinned', $html);
     }
 
+    /** Generic transactional send. Never throws; no-ops gracefully without an API key. */
+    public function sendEmail(string $to, string $subject, string $html): bool
+    {
+        return $this->send($to, $subject, $html);
+    }
+
     private function send(string $to, string $subject, string $html): bool
     {
         if ($this->resendApiKey === '') {
