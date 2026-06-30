@@ -51,6 +51,15 @@ class ProductVariant
     #[Groups(['product:read', 'product:write', 'cart:read', 'order:read'])]
     private int $priceCents = 0;
 
+    /**
+     * Optional "was" price, strictly higher than priceCents, used only to render a
+     * struck-through reference price and a discount badge. Never affects the price
+     * actually charged (priceCents remains the source of truth at checkout).
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['product:read', 'product:write', 'cart:read'])]
+    private ?int $compareAtPriceCents = null;
+
     #[ORM\Column]
     #[Groups(['product:read', 'product:write', 'cart:read'])]
     private int $stock = 0;
@@ -82,6 +91,8 @@ class ProductVariant
     public function setSku(string $sku): self { $this->sku = $sku; return $this; }
     public function getPriceCents(): int { return $this->priceCents; }
     public function setPriceCents(int $priceCents): self { $this->priceCents = $priceCents; return $this; }
+    public function getCompareAtPriceCents(): ?int { return $this->compareAtPriceCents; }
+    public function setCompareAtPriceCents(?int $compareAtPriceCents): self { $this->compareAtPriceCents = $compareAtPriceCents; return $this; }
     public function getStock(): int { return $this->stock; }
     public function setStock(int $stock): self { $this->stock = $stock; return $this; }
     public function isActive(): bool { return $this->active; }

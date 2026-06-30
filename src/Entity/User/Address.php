@@ -56,7 +56,13 @@ class Address
     #[Groups(['user:read', 'user:write', 'order:read'])]
     private ?string $phone = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['user:read', 'user:write'])]
+    private bool $isDefault = false;
+
     public function getId(): ?int { return $this->id; }
+    public function isDefault(): bool { return $this->isDefault; }
+    public function setIsDefault(bool $isDefault): self { $this->isDefault = $isDefault; return $this; }
     public function getUser(): ?User { return $this->user; }
     public function setUser(?User $user): self { $this->user = $user; return $this; }
     public function getFirstName(): string { return $this->firstName; }

@@ -26,7 +26,7 @@ use Symfony\Component\Validator\ConstraintViolationList;
 
 readonly class CheckoutProcessor implements ProcessorInterface
 {
-    private const PAYMENT_METHODS = ['card', 'bancontact', 'paypal'];
+    private const PAYMENT_METHODS = ['card', 'bancontact', 'paypal', 'kbc', 'belfius', 'ideal'];
 
     public function __construct(
         private EntityManagerInterface $em,
