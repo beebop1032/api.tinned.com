@@ -69,6 +69,8 @@ security:
         - { path: ^/api/oauth/login$, roles: PUBLIC_ACCESS }
         - { path: ^/api/me$, roles: PUBLIC_ACCESS }
         - { path: ^/api/coupons/validate$, roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/subscriptions$, roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/subscriptions/confirm/, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api/(delivery_methods|shipping_labels|store_orders), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
         - { path: ^/api/(landing_pages|static_pages), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
