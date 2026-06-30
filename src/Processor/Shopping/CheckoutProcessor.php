@@ -75,7 +75,14 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 continue;
             }
 
-            if ($variant->getStock() < $linePayload['quantity']) {
+            // Coming-soon products are not buyable yet: reject the line outright.
+            if ($product->getAvailability() === 'coming_soon') {
+                $this->fail('items', sprintf('%s n\'est pas encore disponible.', $product->getName()));
+            }
+
+            // Pre-order products can be bought ahead of stock: skip the stock-availability
+            // guard. Any other availability ('available') keeps the original behaviour.
+            if ($product->getAvailability() !== 'preorder' && $variant->getStock() < $linePayload['quantity']) {
                 $this->fail('items', sprintf('Only %d item(s) left for %s.', $variant->getStock(), $variant->getSku()));
             }
 
@@ -137,7 +144,8 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 /** @var ProductVariant $variant */
                 $variant = $storeLine['variant'];
                 $quantity = (int) $storeLine['quantity'];
-                $variant->setStock($variant->getStock() - $quantity);
+                // Pre-orders may exceed available stock; clamp at 0 so stock never goes negative.
+                $variant->setStock(max(0, $variant->getStock() - $quantity));
                 $this->logSaleMovement($variant, $quantity, $storeOrder->getStoreBox()?->getSlug());
 
                 $line = (new OrderLine())

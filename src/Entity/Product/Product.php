@@ -36,11 +36,13 @@ use Symfony\Component\Serializer\Annotation\Groups;
     ],
 )]
 #[ApiFilter(BooleanFilter::class, properties: ['active'])]
-#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'name' => 'partial', 'storeBox.slug' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['slug' => 'exact', 'name' => 'partial', 'storeBox.slug' => 'exact', 'availability' => 'exact'])]
 #[ApiFilter(RangeFilter::class, properties: ['basePriceCents'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'basePriceCents', 'name'])]
 class Product
 {
+    public const AVAILABILITIES = ['available', 'coming_soon', 'preorder'];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -75,6 +77,14 @@ class Product
     #[ORM\Column(options: ['default' => true])]
     #[Groups(['product:read', 'product:write', 'box:read'])]
     private bool $active = true;
+
+    #[ORM\Column(length: 16, options: ['default' => 'available'])]
+    #[Groups(['product:read', 'product:write', 'box:read', 'cart:read', 'order:read'])]
+    private string $availability = 'available';
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['product:read', 'product:write', 'box:read'])]
+    private ?\DateTimeImmutable $releaseAt = null;
 
     /** @var list<string> */
     #[ORM\Column(type: 'json')]
@@ -111,6 +121,11 @@ class Product
     public function setCurrency(string $currency): self { $this->currency = $currency; return $this; }
     public function isActive(): bool { return $this->active; }
     public function setActive(bool $active): self { $this->active = $active; return $this; }
+    public function getAvailability(): string { return $this->availability; }
+    public function setAvailability(string $availability): self { $this->availability = in_array($availability, self::AVAILABILITIES, true) ? $availability : 'available'; return $this; }
+    public function getReleaseAt(): ?\DateTimeImmutable { return $this->releaseAt; }
+    public function setReleaseAt(?\DateTimeImmutable $releaseAt): self { $this->releaseAt = $releaseAt; return $this; }
+    public function isPurchasable(): bool { return $this->availability !== 'coming_soon'; }
     /** @return list<string> */
     public function getImages(): array { return $this->images; }
     /** @param list<string> $images */
