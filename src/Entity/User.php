@@ -2,38 +2,65 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_OAUTH_ACCOUNT', fields: ['oauthProvider', 'oauthId'])]
 #[ORM\Index(name: 'IDX_USER_PASSWORD_RESET_TOKEN', columns: ['password_reset_token_hash'])]
+#[ApiResource(
+    normalizationContext: ['groups' => ['account:read']],
+    operations: [
+        new GetCollection(security: "is_granted('ROLE_ADMIN')"),
+        new Get(security: "is_granted('ROLE_ADMIN')"),
+        new Patch(
+            security: "is_granted('ROLE_ADMIN')",
+            denormalizationContext: ['groups' => ['account:write']],
+        ),
+    ],
+)]
+#[ApiFilter(SearchFilter::class, properties: ['email' => 'partial'])]
+#[ApiFilter(BooleanFilter::class, properties: ['active'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['account:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
+    #[Groups(['account:read'])]
     private ?string $email = null;
 
     #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['account:read', 'account:write'])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['account:read', 'account:write'])]
     private ?string $lastName = null;
 
     #[ORM\Column(length: 40, nullable: true)]
+    #[Groups(['account:read', 'account:write'])]
     private ?string $phone = null;
 
     /**
      * @var list<string> The user roles
      */
     #[ORM\Column]
+    #[Groups(['account:read', 'account:write'])]
     private array $roles = [];
 
     #[ORM\Column]
@@ -46,6 +73,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $oauthId = null;
 
     #[ORM\Column(options: ['default' => true])]
+    #[Groups(['account:read', 'account:write'])]
     private bool $active = true;
 
     #[ORM\Column(length: 64, nullable: true)]
@@ -55,12 +83,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $passwordResetExpiresAt = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['account:read'])]
     private ?\DateTimeImmutable $termsAcceptedAt = null;
 
     #[ORM\Column(options: ['default' => false])]
+    #[Groups(['account:read', 'account:write'])]
     private bool $marketingConsent = false;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['account:read'])]
     private ?\DateTimeImmutable $marketingConsentUpdatedAt = null;
 
     public function getId(): ?int
