@@ -3,6 +3,7 @@
 namespace App\Service\Payment;
 
 use App\Entity\Shopping\CustomerOrder;
+use App\Entity\Shopping\PayoutLedgerEntry;
 use App\Entity\Shopping\StoreOrder;
 use App\Service\Shopping\InvoiceNumberAllocator;
 use App\Service\Shopping\OrderInventoryReleaser;
@@ -54,6 +55,35 @@ class MollieService
      * Resolves the Mollie method to pre-select: the buyer's explicit choice when
      * set, otherwise a country-aware default (Bancontact in Belgium, card elsewhere).
      */
+    /**
+     * Records the frozen commission/payout line for a paid store order (once).
+     */
+    private function recordPayout(StoreOrder $storeOrder): void
+    {
+        $storeBox = $storeOrder->getStoreBox();
+        if (!$storeBox) {
+            return;
+        }
+        if ($this->em->getRepository(PayoutLedgerEntry::class)->findOneBy(['storeOrder' => $storeOrder])) {
+            return;
+        }
+
+        $gross = $storeOrder->getTotalCents();
+        $rate = $storeBox->getCommissionRatePercent();
+        $commission = (int) round($gross * $rate / 100);
+
+        $this->em->persist(
+            (new PayoutLedgerEntry())
+                ->setStoreOrder($storeOrder)
+                ->setStoreBox($storeBox)
+                ->setStoreReference($storeOrder->getCustomerOrder()?->getReference() ?? '')
+                ->setGrossCents($gross)
+                ->setCommissionCents($commission)
+                ->setNetCents($gross - $commission)
+                ->setCommissionRatePercent($rate)
+        );
+    }
+
     private function preferredMethod(CustomerOrder $order): string
     {
         $chosen = $order->getPaymentMethod();
@@ -96,6 +126,8 @@ class MollieService
                     }
                     // Notify each store owner of the new payable order.
                     $this->orderMailer->sendNewOrderToSeller($storeOrder);
+                    // Freeze the commission/payout accounting line for this store order.
+                    $this->recordPayout($storeOrder);
                 }
                 // Payment receipt to the buyer.
                 $this->orderMailer->sendPaymentReceipt($order);

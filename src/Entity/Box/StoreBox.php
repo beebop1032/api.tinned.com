@@ -47,6 +47,16 @@ class StoreBox extends Box
     #[Groups(['box:read', 'box:write', 'product:read'])]
     private ?BusinessBox $businessBox = null;
 
+    /** Platform commission taken on this store's sales, as a percentage (0-100). */
+    #[ORM\Column(options: ['default' => 10])]
+    #[Groups(['box:read'])]
+    private int $commissionRatePercent = 10;
+
+    /** VAT number for legal invoice mentions (e.g. BE0123456789). */
+    #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['box:read', 'box:write'])]
+    private ?string $vatNumber = null;
+
     /** @var Collection<int, Product> */
     #[ORM\OneToMany(mappedBy: 'storeBox', targetEntity: Product::class)]
     private Collection $products;
@@ -65,6 +75,10 @@ class StoreBox extends Box
     public function getType(): string { return self::TYPE_STORE; }
     public function getBusinessBox(): ?BusinessBox { return $this->businessBox; }
     public function setBusinessBox(?BusinessBox $businessBox): self { $this->businessBox = $businessBox; return $this; }
+    public function getCommissionRatePercent(): int { return $this->commissionRatePercent; }
+    public function setCommissionRatePercent(int $commissionRatePercent): self { $this->commissionRatePercent = max(0, min(100, $commissionRatePercent)); return $this; }
+    public function getVatNumber(): ?string { return $this->vatNumber; }
+    public function setVatNumber(?string $vatNumber): self { $this->vatNumber = $vatNumber; return $this; }
     /** @return Collection<int, Product> */
     public function getProducts(): Collection { return $this->products; }
     /** @return Collection<int, BlogBox> */
