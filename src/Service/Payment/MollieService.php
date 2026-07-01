@@ -4,6 +4,7 @@ namespace App\Service\Payment;
 
 use App\Entity\Shopping\CustomerOrder;
 use App\Entity\Shopping\StoreOrder;
+use App\Service\Shopping\InvoiceNumberAllocator;
 use App\Service\Shopping\OrderInventoryReleaser;
 use App\Service\Shopping\OrderMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,6 +21,7 @@ class MollieService
         private EntityManagerInterface $em,
         private OrderInventoryReleaser $inventoryReleaser,
         private OrderMailer $orderMailer,
+        private InvoiceNumberAllocator $invoiceNumberAllocator,
     ) {
         $this->mollie = new MollieApiClient();
         $this->mollie->setApiKey($this->apiKey);
@@ -84,6 +86,10 @@ class MollieService
             // seller has already moved to preparing/shipped.
             if ($order->getStatus() !== CustomerOrder::STATUS_PAID) {
                 $order->setStatus(CustomerOrder::STATUS_PAID);
+                // Assign the legal invoice number once, on first payment confirmation.
+                if ($order->getInvoiceNumber() === null) {
+                    $order->setInvoiceNumber($this->invoiceNumberAllocator->allocate());
+                }
                 foreach ($order->getStoreOrders() as $storeOrder) {
                     if ($storeOrder->getStatus() === StoreOrder::STATUS_OPEN) {
                         $storeOrder->setStatus(StoreOrder::STATUS_WAITING_STORE);

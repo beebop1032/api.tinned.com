@@ -172,7 +172,8 @@ readonly class CheckoutProcessor implements ProcessorInterface
                     $line = (new OrderLine())
                         ->setVariant($variant)
                         ->setQuantity($quantity)
-                        ->setStockReserved($reserved);
+                        ->setStockReserved($reserved)
+                        ->setVatRatePercent($variant->getProduct()?->getVatRatePercent() ?? 21);
                     $storeOrder->addLine($line);
                     $order->addLine($line);
                 }

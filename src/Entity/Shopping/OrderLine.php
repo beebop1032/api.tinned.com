@@ -55,6 +55,11 @@ class OrderLine
     #[Groups(['order:read', 'order:write'])]
     private int $unitPriceCentsSnapshot = 0;
 
+    /** VAT rate (%) snapshotted from the product at checkout, for a stable invoice. */
+    #[ORM\Column(options: ['default' => 21])]
+    #[Groups(['order:read'])]
+    private int $vatRatePercent = 21;
+
     #[ORM\Column]
     #[Groups(['order:read', 'order:write'])]
     private int $quantity = 1;
@@ -97,6 +102,8 @@ class OrderLine
     public function setAttributesSnapshot(array $attributesSnapshot): self { $this->attributesSnapshot = $attributesSnapshot; return $this; }
     public function getUnitPriceCentsSnapshot(): int { return $this->unitPriceCentsSnapshot; }
     public function setUnitPriceCentsSnapshot(int $unitPriceCentsSnapshot): self { $this->unitPriceCentsSnapshot = $unitPriceCentsSnapshot; return $this; }
+    public function getVatRatePercent(): int { return $this->vatRatePercent; }
+    public function setVatRatePercent(int $vatRatePercent): self { $this->vatRatePercent = max(0, min(100, $vatRatePercent)); return $this; }
     public function getQuantity(): int { return $this->quantity; }
     public function setQuantity(int $quantity): self { $this->quantity = $quantity; return $this; }
     #[Groups(['order:read'])]

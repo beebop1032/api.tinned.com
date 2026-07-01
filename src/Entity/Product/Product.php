@@ -74,6 +74,11 @@ class Product
     #[Groups(['product:read', 'product:write', 'box:read', 'cart:read', 'order:read'])]
     private string $currency = 'EUR';
 
+    /** Belgian VAT rate applicable to this product (21 standard, 12, 6, or 0). Prices are VAT-inclusive. */
+    #[ORM\Column(options: ['default' => 21])]
+    #[Groups(['product:read', 'product:write'])]
+    private int $vatRatePercent = 21;
+
     #[ORM\Column(options: ['default' => true])]
     #[Groups(['product:read', 'product:write', 'box:read'])]
     private bool $active = true;
@@ -119,6 +124,8 @@ class Product
     public function setBasePriceCents(int $basePriceCents): self { $this->basePriceCents = $basePriceCents; return $this; }
     public function getCurrency(): string { return $this->currency; }
     public function setCurrency(string $currency): self { $this->currency = $currency; return $this; }
+    public function getVatRatePercent(): int { return $this->vatRatePercent; }
+    public function setVatRatePercent(int $vatRatePercent): self { $this->vatRatePercent = max(0, min(100, $vatRatePercent)); return $this; }
     public function isActive(): bool { return $this->active; }
     public function setActive(bool $active): self { $this->active = $active; return $this; }
     public function getAvailability(): string { return $this->availability; }

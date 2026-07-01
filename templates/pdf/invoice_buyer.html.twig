@@ -8,18 +8,29 @@
     table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background: #f5f5f5; }
+    .right { text-align: right; }
     .total { font-weight: bold; font-size: 14px; }
+    .muted { color: #666; font-size: 11px; }
   </style>
 </head>
 <body>
   <div style="display:flex; justify-content:space-between; margin-bottom:24px;">
-    <div><strong>Tinned / BeebopCity</strong><br>Facture client</div>
-    <div>Réf : {{ order.reference }}<br>Date : {{ order.createdAt|date('d/m/Y') }}</div>
+    <div>
+      <strong>Tinned / BeebopCity SRL</strong><br>
+      <span class="muted">N° entreprise : BE 0700.000.000<br>N° TVA : BE 0700.000.000</span>
+    </div>
+    <div class="right">
+      Facture n° <strong>{{ order.invoiceNumber ?? order.reference }}</strong><br>
+      Réf. commande : {{ order.reference }}<br>
+      Date : {{ order.createdAt|date('d/m/Y') }}
+    </div>
   </div>
-  <h1>Facture #{{ order.reference }}</h1>
+
+  <h1>Facture {{ order.invoiceNumber ?? order.reference }}</h1>
+
   <table>
     <thead>
-      <tr><th>Produit</th><th>SKU</th><th>Qté</th><th>Prix unitaire</th><th>Total</th></tr>
+      <tr><th>Produit</th><th>SKU</th><th>Qté</th><th>TVA</th><th class="right">P.U. TTC</th><th class="right">Total TTC</th></tr>
     </thead>
     <tbody>
       {% for line in order.lines %}
@@ -27,15 +38,53 @@
         <td>{{ line.variant.product.name }}</td>
         <td>{{ line.variant.sku }}</td>
         <td>{{ line.quantity }}</td>
-        <td>{{ (line.variant.priceCents / 100)|number_format(2, ',', ' ') }} €</td>
-        <td>{{ (line.lineTotalCents / 100)|number_format(2, ',', ' ') }} €</td>
+        <td>{{ line.vatRatePercent }} %</td>
+        <td class="right">{{ (line.unitPriceCentsSnapshot / 100)|number_format(2, ',', ' ') }} €</td>
+        <td class="right">{{ (line.lineTotalCents / 100)|number_format(2, ',', ' ') }} €</td>
       </tr>
       {% endfor %}
+      <tr>
+        <td colspan="5">Livraison</td>
+        <td class="right">{{ (order.shippingCents / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      {% if order.discountCents > 0 %}
+      <tr>
+        <td colspan="5">Remise{% if order.couponCode %} ({{ order.couponCode }}){% endif %}</td>
+        <td class="right">-{{ (order.discountCents / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      {% endif %}
     </tbody>
-    <tfoot>
-      <tr><td colspan="4">Livraison</td><td>{{ (order.shippingCents / 100)|number_format(2, ',', ' ') }} €</td></tr>
-      <tr class="total"><td colspan="4">Total</td><td>{{ (order.totalCents / 100)|number_format(2, ',', ' ') }} €</td></tr>
-    </tfoot>
   </table>
+
+  <table style="width: 50%; margin-left: 50%;">
+    <thead>
+      <tr><th>Taux TVA</th><th class="right">Base HT</th><th class="right">TVA</th></tr>
+    </thead>
+    <tbody>
+      {% for rate, amounts in vat.byRate %}
+      <tr>
+        <td>{{ rate }} %</td>
+        <td class="right">{{ (amounts.ht / 100)|number_format(2, ',', ' ') }} €</td>
+        <td class="right">{{ (amounts.vat / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td>Total HT</td>
+        <td class="right" colspan="2">{{ (vat.totalHt / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      <tr>
+        <td>Total TVA</td>
+        <td class="right" colspan="2">{{ (vat.totalVat / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+      <tr class="total">
+        <td>Total TTC</td>
+        <td class="right" colspan="2">{{ (order.totalCents / 100)|number_format(2, ',', ' ') }} €</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted" style="margin-top: 24px;">
+    Montants exprimés en euros, TVA comprise. Facture émise conformément à la réglementation belge en matière de TVA.
+  </p>
 </body>
 </html>

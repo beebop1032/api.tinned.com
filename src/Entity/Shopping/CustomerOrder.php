@@ -95,6 +95,14 @@ class CustomerOrder
     private ?string $couponCode = null;
 
     /**
+     * Legal sequential invoice number, assigned once when the order is paid (distinct
+     * from the internal reference). Null until paid.
+     */
+    #[ORM\Column(length: 40, nullable: true, unique: true)]
+    #[Groups(['order:read'])]
+    private ?string $invoiceNumber = null;
+
+    /**
      * True once the stock + coupon usage reserved at checkout have been given back
      * (payment failed/expired/cancelled). Guards against double restitution when the
      * Mollie webhook is replayed.
@@ -160,6 +168,8 @@ class CustomerOrder
     public function setCouponCode(?string $couponCode): self { $this->couponCode = $couponCode; return $this; }
     public function isInventoryReleased(): bool { return $this->inventoryReleased; }
     public function setInventoryReleased(bool $inventoryReleased): self { $this->inventoryReleased = $inventoryReleased; return $this; }
+    public function getInvoiceNumber(): ?string { return $this->invoiceNumber; }
+    public function setInvoiceNumber(?string $invoiceNumber): self { $this->invoiceNumber = $invoiceNumber; return $this; }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
     public function getPaymentStatus(): string { return $this->paymentStatus; }
