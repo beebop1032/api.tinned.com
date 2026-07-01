@@ -1,0 +1,8 @@
+gesdinet_jwt_refresh_token:
+    refresh_token_class: App\Entity\RefreshToken
+    # 30 days: the refresh token silently mints new 7-day access tokens until then.
+    ttl: 2592000
+    # Sliding window: each successful refresh pushes the refresh-token expiry forward.
+    ttl_update: true
+    # Rotate the refresh token on each use for better security.
+    single_use: true

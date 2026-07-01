@@ -47,6 +47,14 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
+        # Must come before the ^/api firewall so it wins for the refresh path.
+        refresh:
+            pattern: ^/api/token/refresh$
+            stateless: true
+            provider: app_user_provider
+            refresh_jwt:
+                check_path: /api/token/refresh
+
         api:
             pattern: ^/api
             stateless: true
