@@ -66,6 +66,18 @@ class StoreOrder
     #[Groups(['order:read', 'order:write', 'shipping:read'])]
     private ?string $deliveryMode = null;
 
+    #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['order:read', 'shipping:read', 'shipping:write'])]
+    private ?string $trackingNumber = null;
+
+    #[ORM\Column(length: 500, nullable: true)]
+    #[Groups(['order:read', 'shipping:read', 'shipping:write'])]
+    private ?string $trackingUrl = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['order:read', 'shipping:read'])]
+    private ?\DateTimeImmutable $shippedAt = null;
+
     /** @var Collection<int, OrderLine> */
     #[ORM\OneToMany(mappedBy: 'storeOrder', targetEntity: OrderLine::class, cascade: ['persist'], orphanRemoval: true)]
     #[Groups(['order:read', 'shipping:read'])]
@@ -128,6 +140,12 @@ class StoreOrder
     public function setCarrierNameSnapshot(?string $carrierNameSnapshot): self { $this->carrierNameSnapshot = $carrierNameSnapshot; return $this; }
     public function getDeliveryMode(): ?string { return $this->deliveryMode; }
     public function setDeliveryMode(?string $deliveryMode): self { $this->deliveryMode = $deliveryMode; return $this; }
+    public function getTrackingNumber(): ?string { return $this->trackingNumber; }
+    public function setTrackingNumber(?string $trackingNumber): self { $this->trackingNumber = $trackingNumber; return $this; }
+    public function getTrackingUrl(): ?string { return $this->trackingUrl; }
+    public function setTrackingUrl(?string $trackingUrl): self { $this->trackingUrl = $trackingUrl; return $this; }
+    public function getShippedAt(): ?\DateTimeImmutable { return $this->shippedAt; }
+    public function setShippedAt(?\DateTimeImmutable $shippedAt): self { $this->shippedAt = $shippedAt; return $this; }
     /** @return Collection<int, OrderLine> */
     public function getLines(): Collection { return $this->lines; }
     public function addLine(OrderLine $line): self

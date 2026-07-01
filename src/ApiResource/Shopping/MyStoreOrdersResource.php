@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use App\Entity\Shopping\StoreOrder;
+use App\Processor\Shopping\StoreOrderShipProcessor;
 use App\Provider\Shopping\MyStoreOrdersProvider;
 
 #[ApiResource(
@@ -23,6 +24,7 @@ use App\Provider\Shopping\MyStoreOrdersProvider;
             normalizationContext: ['groups' => ['shipping:read']],
             denormalizationContext: ['groups' => ['shipping:write']],
             provider: MyStoreOrdersProvider::class,
+            processor: StoreOrderShipProcessor::class,
             security: "is_granted('ROLE_USER') and (object.getStoreBox() === null or object.getStoreBox().getOwner() === null or object.getStoreBox().getOwner().getId() === user.getId())",
         ),
     ],

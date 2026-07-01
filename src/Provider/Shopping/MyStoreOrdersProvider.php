@@ -19,9 +19,23 @@ class MyStoreOrdersProvider implements ProviderInterface
         private Security $security,
     ) {}
 
-    public function provide(Operation $operation, array $uriVariables = [], array $context = []): array
+    public function provide(Operation $operation, array $uriVariables = [], array $context = []): StoreOrder|array|null
     {
         $user = $this->security->getUser();
+
+        // Item operation (Patch): return the single store order, owner-scoped.
+        if (isset($uriVariables['id'])) {
+            if (!$user instanceof User) {
+                return null;
+            }
+            $storeOrder = $this->em->getRepository(StoreOrder::class)->find($uriVariables['id']);
+            if (!$storeOrder || $storeOrder->getStoreBox()?->getOwner()?->getId() !== $user->getId()) {
+                return null;
+            }
+
+            return $storeOrder;
+        }
+
         if (!$user instanceof User) {
             return [];
         }
