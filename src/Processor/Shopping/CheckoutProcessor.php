@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Entity\Delivery\DeliveryMethod;
+use App\Entity\Product\ProductBundle;
 use App\Entity\Product\ProductVariant;
 use App\Entity\Product\StockMovement;
 use App\Entity\Shopping\Coupon;
@@ -56,8 +57,11 @@ readonly class CheckoutProcessor implements ProcessorInterface
         }
 
         $addressPayload = $this->normaliseAddress($data->address);
-        $linePayloads = $this->normaliseItems($data->items);
         $selectedStoreSlugs = $this->normaliseStringList($data->selectedStoreSlugs);
+        // Expand bundle items into their component variant lines; the savings vs the sum
+        // of components is realised as an order-level discount (additive with coupons).
+        [$bundleLines, $bundleDiscountCents] = $this->expandBundles($data->items);
+        $linePayloads = $this->mergeLinePayloads($this->normaliseItems($data->items), $bundleLines);
         $carrierByStore = $this->normaliseCarrierSelections($data->carrierSelections);
         $availableDeliveryMethods = $this->availableDeliveryMethods($addressPayload['countryCode']);
 
@@ -184,6 +188,9 @@ readonly class CheckoutProcessor implements ProcessorInterface
 
             $order->recalculateTotals();
             $this->applyCoupon($order, $data->couponCode);
+            if ($bundleDiscountCents > 0) {
+                $order->setDiscountCents(min($order->getSubtotalCents(), $order->getDiscountCents() + $bundleDiscountCents));
+            }
             $this->em->flush();
             $this->em->commit();
         } catch (\Throwable $e) {
@@ -263,6 +270,10 @@ readonly class CheckoutProcessor implements ProcessorInterface
     {
         $quantitiesBySku = [];
         foreach ($items as $item) {
+            // Bundle lines are expanded separately (see expandBundles); skip them here.
+            if (trim((string) ($item['bundleSlug'] ?? '')) !== '') {
+                continue;
+            }
             $sku = trim((string) ($item['variantSku'] ?? ''));
             $quantity = max(1, min(99, (int) ($item['quantity'] ?? 1)));
             if ($sku === '') {
@@ -278,6 +289,71 @@ readonly class CheckoutProcessor implements ProcessorInterface
         }
 
         return $lines;
+    }
+
+    /**
+     * Expands bundle items (entries carrying a `bundleSlug`) into their component
+     * variant lines and returns those lines plus the total bundle savings in cents
+     * (sum of components minus the bundle price, per unit ordered).
+     *
+     * @param list<array<string, mixed>> $items
+     * @return array{0: list<array{variantSku: string, quantity: int}>, 1: int}
+     */
+    private function expandBundles(array $items): array
+    {
+        $lines = [];
+        $discountCents = 0;
+        foreach ($items as $item) {
+            $slug = trim((string) ($item['bundleSlug'] ?? ''));
+            if ($slug === '') {
+                continue;
+            }
+            $quantity = max(1, min(99, (int) ($item['quantity'] ?? 1)));
+
+            $bundle = $this->em->getRepository(ProductBundle::class)->findOneBy(['slug' => $slug, 'active' => true]);
+            if (!$bundle) {
+                $this->fail('items', sprintf('Bundle %s is not available.', $slug));
+            }
+
+            foreach ($bundle->getItems() as $bundleItem) {
+                $variant = $bundleItem->getVariant();
+                if (!$variant) {
+                    continue;
+                }
+                $lines[] = [
+                    'variantSku' => $variant->getSku(),
+                    'quantity' => $bundleItem->getQuantity() * $quantity,
+                ];
+            }
+
+            $savingsPerBundle = max(0, $bundle->getComponentsTotalCents() - $bundle->getPriceCents());
+            $discountCents += $savingsPerBundle * $quantity;
+        }
+
+        return [$lines, $discountCents];
+    }
+
+    /**
+     * Aggregates two lists of {variantSku, quantity} into one, summing quantities by SKU.
+     *
+     * @param list<array{variantSku: string, quantity: int}> $a
+     * @param list<array{variantSku: string, quantity: int}> $b
+     * @return list<array{variantSku: string, quantity: int}>
+     */
+    private function mergeLinePayloads(array $a, array $b): array
+    {
+        $bySku = [];
+        foreach ([...$a, ...$b] as $line) {
+            $sku = $line['variantSku'];
+            $bySku[$sku] = ($bySku[$sku] ?? 0) + (int) $line['quantity'];
+        }
+
+        $merged = [];
+        foreach ($bySku as $sku => $quantity) {
+            $merged[] = ['variantSku' => $sku, 'quantity' => min(99, $quantity)];
+        }
+
+        return $merged;
     }
 
     /**

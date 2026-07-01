@@ -6,6 +6,7 @@ use App\Entity\Box\Box;
 use App\Entity\Content\Article;
 use App\Entity\Content\Trip;
 use App\Entity\Product\Product;
+use App\Entity\Product\ProductBundle;
 use App\Entity\Product\ProductVariant;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -18,6 +19,7 @@ class BoxOwnerVoter extends Voter
     public const ARTICLE_EDIT = 'ARTICLE_EDIT';
     public const PRODUCT_EDIT = 'PRODUCT_EDIT';
     public const VARIANT_EDIT = 'VARIANT_EDIT';
+    public const BUNDLE_EDIT = 'BUNDLE_EDIT';
     public const TRIP_EDIT = 'TRIP_EDIT';
 
     public function __construct(private Security $security) {}
@@ -29,6 +31,7 @@ class BoxOwnerVoter extends Voter
             self::ARTICLE_EDIT => $subject instanceof Article,
             self::PRODUCT_EDIT => $subject instanceof Product,
             self::VARIANT_EDIT => $subject instanceof ProductVariant,
+            self::BUNDLE_EDIT => $subject instanceof ProductBundle,
             self::TRIP_EDIT => $subject instanceof Trip,
             default => false,
         };
@@ -50,6 +53,7 @@ class BoxOwnerVoter extends Voter
             $subject instanceof Article => $subject->getBlogBox()?->getOwner()?->getId() === $user->getId(),
             $subject instanceof Product => $subject->getStoreBox()?->getOwner()?->getId() === $user->getId(),
             $subject instanceof ProductVariant => $subject->getProduct()?->getStoreBox()?->getOwner()?->getId() === $user->getId(),
+            $subject instanceof ProductBundle => $subject->getStoreBox()?->getOwner()?->getId() === $user->getId(),
             $subject instanceof Trip => $subject->getTravelBox()?->getOwner()?->getId() === $user->getId(),
             default => false,
         };
