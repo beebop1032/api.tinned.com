@@ -23,9 +23,9 @@ use Symfony\Component\Serializer\Annotation\Groups;
     operations: [
         new GetCollection(),
         new Get(),
-        new Post(security: "is_granted('ROLE_USER')"),
-        new Patch(security: "is_granted('ROLE_USER')"),
-        new Delete(security: "is_granted('ROLE_USER')"),
+        new Post(securityPostDenormalize: "is_granted('VARIANT_EDIT', object)"),
+        new Patch(security: "is_granted('VARIANT_EDIT', object)"),
+        new Delete(security: "is_granted('VARIANT_EDIT', object)"),
     ],
 )]
 #[ApiFilter(BooleanFilter::class, properties: ['active'])]
