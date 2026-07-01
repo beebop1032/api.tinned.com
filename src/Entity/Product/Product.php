@@ -101,6 +101,11 @@ class Product
     #[Groups(['product:read'])]
     private Collection $variants;
 
+    /** @var Collection<int, ProductTranslation> */
+    #[ORM\OneToMany(mappedBy: 'product', targetEntity: ProductTranslation::class, cascade: ['persist'], orphanRemoval: true)]
+    #[Groups(['product:read'])]
+    private Collection $translations;
+
     #[ORM\Column]
     #[Groups(['product:read'])]
     private \DateTimeImmutable $createdAt;
@@ -108,8 +113,14 @@ class Product
     public function __construct()
     {
         $this->variants = new ArrayCollection();
+        $this->translations = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
     }
+
+    /** @return Collection<int, ProductTranslation> */
+    public function getTranslations(): Collection { return $this->translations; }
+    public function addTranslation(ProductTranslation $translation): self { if (!$this->translations->contains($translation)) { $this->translations->add($translation); $translation->setProduct($this); } return $this; }
+    public function removeTranslation(ProductTranslation $translation): self { if ($this->translations->removeElement($translation) && $translation->getProduct() === $this) { $translation->setProduct(null); } return $this; }
 
     public function getId(): ?int { return $this->id; }
     public function getStoreBox(): ?StoreBox { return $this->storeBox; }
