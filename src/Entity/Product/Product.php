@@ -110,6 +110,15 @@ class Product
     #[Groups(['product:read'])]
     private \DateTimeImmutable $createdAt;
 
+    /** Number of approved reviews. Denormalized from Review by ProductRatingUpdater. */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['product:read', 'box:read'])]
+    private int $ratingCount = 0;
+
+    /** Sum of approved review ratings, used to derive the average without a join. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $ratingSum = 0;
+
     public function __construct()
     {
         $this->variants = new ArrayCollection();
@@ -152,4 +161,16 @@ class Product
     public function getVariants(): Collection { return $this->variants; }
     public function addVariant(ProductVariant $variant): self { if (!$this->variants->contains($variant)) { $this->variants->add($variant); $variant->setProduct($this); } return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+
+    public function getRatingCount(): int { return $this->ratingCount; }
+    public function setRatingCount(int $ratingCount): self { $this->ratingCount = max(0, $ratingCount); return $this; }
+    public function getRatingSum(): int { return $this->ratingSum; }
+    public function setRatingSum(int $ratingSum): self { $this->ratingSum = max(0, $ratingSum); return $this; }
+
+    /** Average star rating (0 when there are no approved reviews), rounded to 1 decimal. */
+    #[Groups(['product:read', 'box:read'])]
+    public function getRatingAverage(): float
+    {
+        return $this->ratingCount > 0 ? round($this->ratingSum / $this->ratingCount, 1) : 0.0;
+    }
 }
