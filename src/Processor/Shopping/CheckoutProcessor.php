@@ -31,6 +31,12 @@ readonly class CheckoutProcessor implements ProcessorInterface
 {
     private const PAYMENT_METHODS = ['card', 'bancontact', 'paypal', 'kbc', 'belfius', 'ideal'];
 
+    /**
+     * Discount granted for pre-ordering a not-yet-released product (coming_soon/preorder).
+     * Must stay aligned with PREORDER_DISCOUNT_PCT in front/lib/commerce.ts.
+     */
+    private const PREORDER_DISCOUNT_PERCENT = 15;
+
     public function __construct(
         private EntityManagerInterface $em,
         private Security $security,
@@ -67,6 +73,8 @@ readonly class CheckoutProcessor implements ProcessorInterface
 
         $variantRepository = $this->em->getRepository(ProductVariant::class);
         $stores = [];
+        // Subtotal of pre-launch (coming_soon/preorder) lines — the base for the pre-order discount.
+        $preorderSubtotalCents = 0;
         foreach ($linePayloads as $linePayload) {
             /** @var ProductVariant|null $variant */
             $variant = $variantRepository->findOneBy(['sku' => $linePayload['variantSku']]);
@@ -84,15 +92,23 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 continue;
             }
 
-            // Coming-soon products are not buyable yet: reject the line outright.
-            if ($product->getAvailability() === 'coming_soon') {
+            $availability = $product->getAvailability();
+            $isPreLaunch = in_array($availability, ['coming_soon', 'preorder'], true);
+
+            // Coming-soon products can be pre-ordered only when the seller exposes a price
+            // (isPreorderable). Otherwise they stay waitlist-only and the line is rejected.
+            if ($availability === 'coming_soon' && !$product->isPreorderable()) {
                 $this->fail('items', sprintf('%s n\'est pas encore disponible.', $product->getName()));
             }
 
-            // Pre-order products can be bought ahead of stock: skip the stock-availability
-            // guard. Any other availability ('available') keeps the original behaviour.
-            if ($product->getAvailability() !== 'preorder' && $variant->getStock() < $linePayload['quantity']) {
+            // Pre-launch products (coming_soon/preorder) can be bought ahead of stock: skip
+            // the stock-availability guard. 'available' keeps the original behaviour.
+            if (!$isPreLaunch && $variant->getStock() < $linePayload['quantity']) {
                 $this->fail('items', sprintf('Only %d item(s) left for %s.', $variant->getStock(), $variant->getSku()));
+            }
+
+            if ($isPreLaunch) {
+                $preorderSubtotalCents += $variant->getPriceCents() * $linePayload['quantity'];
             }
 
             $storeSlug = $storeBox->getSlug();
@@ -161,7 +177,7 @@ readonly class CheckoutProcessor implements ProcessorInterface
                     // Lock the row, then re-check stock against the locked value so the
                     // guard holds under concurrency (the earlier check is only fail-fast).
                     $this->em->lock($variant, LockMode::PESSIMISTIC_WRITE);
-                    $isPreorder = $variant->getProduct()?->getAvailability() === 'preorder';
+                    $isPreorder = in_array($variant->getProduct()?->getAvailability(), ['coming_soon', 'preorder'], true);
                     if (!$isPreorder && $variant->getStock() < $quantity) {
                         $this->fail('items', sprintf('Only %d item(s) left for %s.', $variant->getStock(), $variant->getSku()));
                     }
@@ -190,6 +206,11 @@ readonly class CheckoutProcessor implements ProcessorInterface
             $this->applyCoupon($order, $data->couponCode);
             if ($bundleDiscountCents > 0) {
                 $order->setDiscountCents(min($order->getSubtotalCents(), $order->getDiscountCents() + $bundleDiscountCents));
+            }
+            // Pre-order incentive: 15% off the pre-launch lines, additive with coupon/bundle.
+            $preorderDiscountCents = intdiv($preorderSubtotalCents * self::PREORDER_DISCOUNT_PERCENT, 100);
+            if ($preorderDiscountCents > 0) {
+                $order->setDiscountCents(min($order->getSubtotalCents(), $order->getDiscountCents() + $preorderDiscountCents));
             }
             $this->em->flush();
             $this->em->commit();

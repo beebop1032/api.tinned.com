@@ -91,6 +91,15 @@ class Product
     #[Groups(['product:read', 'product:write', 'box:read'])]
     private ?\DateTimeImmutable $releaseAt = null;
 
+    /**
+     * When true, a not-yet-released product keeps its price hidden and cannot be
+     * pre-ordered: the buyer only gets the "notify me" waitlist. When false (default)
+     * a coming_soon/preorder product with a known price can be pre-ordered.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['product:read', 'product:write', 'box:read'])]
+    private bool $hidePriceWhenUnavailable = false;
+
     /** @var list<string> */
     #[ORM\Column(type: 'json')]
     #[Groups(['product:read', 'product:write', 'box:read'])]
@@ -152,7 +161,20 @@ class Product
     public function setAvailability(string $availability): self { $this->availability = in_array($availability, self::AVAILABILITIES, true) ? $availability : 'available'; return $this; }
     public function getReleaseAt(): ?\DateTimeImmutable { return $this->releaseAt; }
     public function setReleaseAt(?\DateTimeImmutable $releaseAt): self { $this->releaseAt = $releaseAt; return $this; }
+    public function isHidePriceWhenUnavailable(): bool { return $this->hidePriceWhenUnavailable; }
+    public function setHidePriceWhenUnavailable(bool $hide): self { $this->hidePriceWhenUnavailable = $hide; return $this; }
     public function isPurchasable(): bool { return $this->availability !== 'coming_soon'; }
+
+    /**
+     * A pre-launch product (coming_soon or preorder) that can be bought ahead of its
+     * release: the price is known and the seller has not chosen to hide it.
+     */
+    public function isPreorderable(): bool
+    {
+        return in_array($this->availability, ['coming_soon', 'preorder'], true)
+            && $this->basePriceCents > 0
+            && !$this->hidePriceWhenUnavailable;
+    }
     /** @return list<string> */
     public function getImages(): array { return $this->images; }
     /** @param list<string> $images */
