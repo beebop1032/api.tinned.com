@@ -73,8 +73,6 @@ readonly class CheckoutProcessor implements ProcessorInterface
 
         $variantRepository = $this->em->getRepository(ProductVariant::class);
         $stores = [];
-        // Subtotal of pre-launch (coming_soon/preorder) lines — the base for the pre-order discount.
-        $preorderSubtotalCents = 0;
         foreach ($linePayloads as $linePayload) {
             /** @var ProductVariant|null $variant */
             $variant = $variantRepository->findOneBy(['sku' => $linePayload['variantSku']]);
@@ -107,10 +105,6 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 $this->fail('items', sprintf('Only %d item(s) left for %s.', $variant->getStock(), $variant->getSku()));
             }
 
-            if ($isPreLaunch) {
-                $preorderSubtotalCents += $variant->getPriceCents() * $linePayload['quantity'];
-            }
-
             $storeSlug = $storeBox->getSlug();
             if (!isset($stores[$storeSlug])) {
                 $stores[$storeSlug] = [
@@ -125,7 +119,9 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 'variant' => $variant,
                 'quantity' => $linePayload['quantity'],
             ];
-            $stores[$storeSlug]['subtotalCents'] += $variant->getPriceCents() * $linePayload['quantity'];
+            // Pre-launch lines are priced at the discounted unit price, so the store subtotal
+            // (and the free-shipping threshold it feeds) reflects what the buyer actually pays.
+            $stores[$storeSlug]['subtotalCents'] += $this->effectiveUnitCents($variant) * $linePayload['quantity'];
         }
 
         if ($stores === []) {
@@ -194,6 +190,10 @@ readonly class CheckoutProcessor implements ProcessorInterface
                         ->setQuantity($quantity)
                         ->setStockReserved($reserved)
                         ->setVatRatePercent($variant->getProduct()?->getVatRatePercent() ?? 21);
+                    // Snapshot the effective sale price: for a pre-order this is the −15% price,
+                    // so line total, per-rate VAT and the invoice all reconcile exactly (no
+                    // order-level lump to allocate). setVariant snapshots the full price first.
+                    $line->setUnitPriceCentsSnapshot($this->effectiveUnitCents($variant));
                     $storeOrder->addLine($line);
                     $order->addLine($line);
                 }
@@ -202,15 +202,12 @@ readonly class CheckoutProcessor implements ProcessorInterface
                 $this->em->persist($storeOrder);
             }
 
+            // Pre-order lines already carry their −15% price on the line snapshot, so totals
+            // and VAT flow from the lines. discountCents stays reserved for order-wide promos.
             $order->recalculateTotals();
             $this->applyCoupon($order, $data->couponCode);
             if ($bundleDiscountCents > 0) {
                 $order->setDiscountCents(min($order->getSubtotalCents(), $order->getDiscountCents() + $bundleDiscountCents));
-            }
-            // Pre-order incentive: 15% off the pre-launch lines, additive with coupon/bundle.
-            $preorderDiscountCents = intdiv($preorderSubtotalCents * self::PREORDER_DISCOUNT_PERCENT, 100);
-            if ($preorderDiscountCents > 0) {
-                $order->setDiscountCents(min($order->getSubtotalCents(), $order->getDiscountCents() + $preorderDiscountCents));
             }
             $this->em->flush();
             $this->em->commit();
@@ -234,6 +231,21 @@ readonly class CheckoutProcessor implements ProcessorInterface
         $this->orderMailer->sendOrderReceived($order);
 
         return $this->responseFactory->fromOrder($order, $checkoutUrl);
+    }
+
+    /**
+     * Effective sale price of a variant, in cents: the discounted −15% price for a pre-launch
+     * product (coming_soon/preorder), otherwise the catalogue price. Rounded the same way as
+     * the front (round half away from zero) so the displayed price equals what is charged.
+     */
+    private function effectiveUnitCents(ProductVariant $variant): int
+    {
+        $full = $variant->getPriceCents();
+        if (in_array($variant->getProduct()?->getAvailability(), ['coming_soon', 'preorder'], true)) {
+            return (int) round($full * (100 - self::PREORDER_DISCOUNT_PERCENT) / 100);
+        }
+
+        return $full;
     }
 
     /**
