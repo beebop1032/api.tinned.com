@@ -9,6 +9,7 @@ use App\Service\Shopping\InvoiceNumberAllocator;
 use App\Service\Shopping\OrderInventoryReleaser;
 use App\Service\Shopping\OrderMailer;
 use Doctrine\ORM\EntityManagerInterface;
+use Mollie\Api\Exceptions\ApiException;
 use Mollie\Api\MollieApiClient;
 
 class MollieService
@@ -30,11 +31,8 @@ class MollieService
 
     public function createPayment(CustomerOrder $order): string
     {
-        $payment = $this->mollie->payments->create([
-            'amount' => [
-                'currency' => $order->getCurrency(),
-                'value' => number_format($order->getTotalCents() / 100, 2, '.', ''),
-            ],
+        $payload = [
+            'amount' => $this->money($order->getTotalCents(), $order->getCurrency()),
             'description' => 'Tinned order ' . $order->getReference(),
             // Pre-select the buyer's chosen method so Mollie opens straight on it
             // (Bancontact dominates in BE) instead of defaulting to card.
@@ -43,12 +41,101 @@ class MollieService
             'redirectUrl' => $this->redirectUrl . '?order=' . rawurlencode($order->getReference()),
             'webhookUrl' => $this->webhookUrl,
             'metadata' => ['orderId' => $order->getId()],
-        ]);
+        ];
+
+        // Send the order lines to Mollie when they reconcile exactly to the total.
+        $lines = $this->buildLines($order);
+        try {
+            $payment = $this->mollie->payments->create($lines === [] ? $payload : $payload + ['lines' => $lines]);
+        } catch (ApiException) {
+            // Mollie rejected the lines (validation/rounding/method): retry on the total alone,
+            // which is exact. A payment must never fail because of the (optional) line details.
+            $payment = $this->mollie->payments->create($payload);
+        }
 
         $order->setMolliePaymentId($payment->id);
         $this->em->flush();
 
         return $payment->getCheckoutUrl();
+    }
+
+    /** A Mollie amount object from integer cents (2-decimal string, dot separator). */
+    private function money(int $cents, string $currency): array
+    {
+        return ['currency' => $currency, 'value' => number_format($cents / 100, 2, '.', '')];
+    }
+
+    /**
+     * Builds Mollie payment lines (products + shipping + order discount) from the order,
+     * with amounts in Mollie's own convention: prices are VAT-inclusive, so each line's
+     * vatAmount = round(totalAmount × rate / (100 + rate)). Returns [] (→ send the total
+     * only) if the lines don't reconcile exactly to the order total, so Mollie never rejects
+     * on a cent mismatch.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildLines(CustomerOrder $order): array
+    {
+        $currency = $order->getCurrency();
+        $lines = [];
+        $sumCents = 0;
+
+        foreach ($order->getLines() as $line) {
+            $quantity = $line->getQuantity();
+            $unitCents = $line->getUnitPriceCentsSnapshot();
+            $totalCents = $unitCents * $quantity;
+            $rate = $line->getVatRatePercent();
+            $lines[] = [
+                'type' => 'physical',
+                'description' => $line->getProductNameSnapshot() ?: 'Article',
+                'quantity' => $quantity,
+                'unitPrice' => $this->money($unitCents, $currency),
+                'totalAmount' => $this->money($totalCents, $currency),
+                'vatRate' => number_format($rate, 2, '.', ''),
+                'vatAmount' => $this->money($this->vatOf($totalCents, $rate), $currency),
+            ];
+            $sumCents += $totalCents;
+        }
+
+        $shippingCents = $order->getShippingCents();
+        if ($shippingCents > 0) {
+            $rate = 21; // Livraison au taux standard (comme la facture).
+            $lines[] = [
+                'type' => 'shipping_fee',
+                'description' => 'Frais de livraison',
+                'quantity' => 1,
+                'unitPrice' => $this->money($shippingCents, $currency),
+                'totalAmount' => $this->money($shippingCents, $currency),
+                'vatRate' => number_format($rate, 2, '.', ''),
+                'vatAmount' => $this->money($this->vatOf($shippingCents, $rate), $currency),
+            ];
+            $sumCents += $shippingCents;
+        }
+
+        // Order-wide discount (coupon/bundle) as a negative line. The pre-order −15% is NOT
+        // here: it is already baked into each pre-order line's unit price.
+        $discountCents = $order->getDiscountCents();
+        if ($discountCents > 0) {
+            $rate = 21;
+            $lines[] = [
+                'type' => 'discount',
+                'description' => $order->getCouponCode() ? 'Remise ' . $order->getCouponCode() : 'Remise',
+                'quantity' => 1,
+                'unitPrice' => $this->money(-$discountCents, $currency),
+                'totalAmount' => $this->money(-$discountCents, $currency),
+                'vatRate' => number_format($rate, 2, '.', ''),
+                'vatAmount' => $this->money(-$this->vatOf($discountCents, $rate), $currency),
+            ];
+            $sumCents -= $discountCents;
+        }
+
+        return $sumCents === $order->getTotalCents() ? $lines : [];
+    }
+
+    /** VAT included in a VAT-inclusive amount, rounded Mollie's way. */
+    private function vatOf(int $ttcCents, int $ratePercent): int
+    {
+        return (int) round($ttcCents * $ratePercent / (100 + $ratePercent));
     }
 
     /**
