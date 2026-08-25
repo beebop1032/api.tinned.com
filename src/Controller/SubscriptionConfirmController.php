@@ -33,6 +33,12 @@ class SubscriptionConfirmController extends AbstractController
 
         try {
             $this->mailer->sendWelcome($subscription);
+            // Déclenche une éventuelle séquence Resend (relances). Le welcome reste
+            // envoyé directement : l'automation ne doit pas le redoubler.
+            $this->mailer->sendEvent('subscription.confirmed', $subscription->getEmail(), [
+                'targetType' => $subscription->getTargetType(),
+                'locale' => $subscription->getLocale(),
+            ]);
         } catch (\Throwable) {
             // Never break confirmation on a mail failure.
         }

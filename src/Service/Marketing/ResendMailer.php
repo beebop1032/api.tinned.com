@@ -56,10 +56,96 @@ class ResendMailer
         return $this->send($s->getEmail(), 'Bienvenue chez Tinned', $html);
     }
 
+    /** Le produit attendu est en ligne : envoyé aux inscrits « coming soon ». */
+    public function sendLaunchLive(Subscription $s, string $productName, string $url): bool
+    {
+        $html = sprintf(
+            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
+            .'<h2>C\'est en ligne 🎉</h2>'
+            .'<p>Bonjour,</p>'
+            .'<p><strong>%s</strong> est désormais disponible sur Tinned. Vous nous aviez demandé d\'être prévenu·e — c\'est le moment&nbsp;!</p>'
+            .'<p><a href="%s" style="display:inline-block;padding:12px 24px;background:#E8A33D;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Découvrir le produit</a></p>'
+            .'<p>À très vite,<br>L\'équipe Tinned</p>'
+            .'</div>',
+            htmlspecialchars($productName, ENT_QUOTES),
+            htmlspecialchars($url, ENT_QUOTES)
+        );
+
+        return $this->send($s->getEmail(), sprintf('%s est disponible sur Tinned', $productName), $html);
+    }
+
+    /** Le produit est de retour en stock : envoyé aux inscrits « épuisé ». */
+    public function sendBackInStock(Subscription $s, string $productName, string $url): bool
+    {
+        $html = sprintf(
+            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
+            .'<h2>De retour en stock 📦</h2>'
+            .'<p>Bonjour,</p>'
+            .'<p><strong>%s</strong> est de nouveau disponible. Les stocks sont limités, ne tardez pas.</p>'
+            .'<p><a href="%s" style="display:inline-block;padding:12px 24px;background:#E8A33D;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Commander maintenant</a></p>'
+            .'<p>À très vite,<br>L\'équipe Tinned</p>'
+            .'</div>',
+            htmlspecialchars($productName, ENT_QUOTES),
+            htmlspecialchars($url, ENT_QUOTES)
+        );
+
+        return $this->send($s->getEmail(), sprintf('%s est de retour en stock', $productName), $html);
+    }
+
     /** Generic transactional send. Never throws; no-ops gracefully without an API key. */
     public function sendEmail(string $to, string $subject, string $html): bool
     {
         return $this->send($to, $subject, $html);
+    }
+
+    /**
+     * Déclenche une Automation Resend (séquence event-driven) pour un contact.
+     * Résilient comme send() : no-op si la clé est absente, ne lève jamais.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function sendEvent(string $event, string $email, array $payload = []): bool
+    {
+        if ($this->resendApiKey === '') {
+            $this->logger->info('ResendMailer: RESEND_API_KEY absent, event non envoyé (no-op).', [
+                'event' => $event,
+                'email' => $email,
+            ]);
+
+            return false;
+        }
+
+        try {
+            $response = $this->httpClient->request('POST', 'https://api.resend.com/events/send', [
+                'auth_bearer' => $this->resendApiKey,
+                'json' => array_filter([
+                    'event' => $event,
+                    'email' => $email,
+                    'payload' => $payload ?: null,
+                ], static fn ($v) => $v !== null),
+            ]);
+
+            $status = $response->getStatusCode();
+            if ($status >= 200 && $status < 300) {
+                return true;
+            }
+
+            $this->logger->error('ResendMailer: réponse non-2xx sur events/send.', [
+                'event' => $event,
+                'email' => $email,
+                'status' => $status,
+            ]);
+
+            return false;
+        } catch (\Throwable $e) {
+            $this->logger->error('ResendMailer: échec events/send.', [
+                'event' => $event,
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function send(string $to, string $subject, string $html): bool

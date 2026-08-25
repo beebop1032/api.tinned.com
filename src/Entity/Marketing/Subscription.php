@@ -100,6 +100,12 @@ class Subscription
     #[Groups(['subscription:read'])]
     private ?\DateTimeImmutable $confirmedAt = null;
 
+    // Horodatage de l'email de mise en ligne / retour en stock déjà envoyé.
+    // Garantit « un seul email, rien d'autre » : un inscrit n'est notifié qu'une fois.
+    #[ORM\Column(nullable: true)]
+    #[Groups(['subscription:read'])]
+    private ?\DateTimeImmutable $notifiedAt = null;
+
     #[ORM\Column(length: 5, options: ['default' => 'fr'])]
     #[Groups(['subscription:read', 'subscription:write'])]
     private string $locale = 'fr';
@@ -132,6 +138,8 @@ class Subscription
     public function setConfirmToken(?string $confirmToken): static { $this->confirmToken = $confirmToken; return $this; }
     public function getConfirmedAt(): ?\DateTimeImmutable { return $this->confirmedAt; }
     public function setConfirmedAt(?\DateTimeImmutable $confirmedAt): static { $this->confirmedAt = $confirmedAt; return $this; }
+    public function getNotifiedAt(): ?\DateTimeImmutable { return $this->notifiedAt; }
+    public function setNotifiedAt(?\DateTimeImmutable $notifiedAt): static { $this->notifiedAt = $notifiedAt; return $this; }
     public function getLocale(): string { return $this->locale; }
     public function setLocale(string $locale): static { $this->locale = $locale; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }

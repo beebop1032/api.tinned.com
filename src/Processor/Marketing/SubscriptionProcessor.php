@@ -60,6 +60,12 @@ class SubscriptionProcessor implements ProcessorInterface
             $this->em->flush();
 
             $this->safeSend(fn () => $this->mailer->sendWelcome($data));
+            // Déclenche une éventuelle séquence Resend (relances J+3, etc.). Le welcome
+            // reste envoyé directement ci-dessus : l'automation ne doit pas le redoubler.
+            $this->safeSend(fn () => $this->mailer->sendEvent('subscription.confirmed', $data->getEmail(), [
+                'targetType' => $data->getTargetType(),
+                'locale' => $data->getLocale(),
+            ]));
 
             return $data;
         }
