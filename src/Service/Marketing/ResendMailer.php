@@ -3,16 +3,20 @@
 namespace App\Service\Marketing;
 
 use App\Entity\Marketing\Subscription;
+use App\Entity\User;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Minimal Resend transactional email client.
+ * Minimal Resend email client.
  *
  * Resilient by design: if RESEND_API_KEY is empty the mailer no-ops (logs and
  * returns false, no HTTP call). Any HTTP failure is caught and returns false —
- * it never throws, so a mail problem can never break a subscription.
+ * it never throws, so a mail problem can never break a flow.
+ *
+ * Les envois marketing portent un lien + en-tête List-Unsubscribe ; le transactionnel
+ * (vérification d'email) n'en a pas.
  */
 class ResendMailer
 {
@@ -24,44 +28,70 @@ class ResendMailer
         private readonly string $resendApiKey = '',
         #[Autowire('%env(RESEND_FROM)%')]
         private readonly string $fromAddress = 'Tinned <onboarding@resend.dev>',
+        #[Autowire('%env(APP_FRONT_URL)%')]
+        private readonly string $frontUrl = 'http://localhost:4001',
+        // Domaine public de l'API (sert aussi les assets email) — pour l'endpoint one-click.
+        #[Autowire('%env(MAIL_ASSETS_URL)%')]
+        private readonly string $apiUrl = 'https://api.tinned.com',
     ) {
     }
 
+    /** Vérification d'email (transactionnel, pas de désinscription). */
+    public function sendVerification(User $user, string $verifyUrl): bool
+    {
+        $mail = $this->renderer->verification($user, $verifyUrl);
+
+        return $this->send((string) $user->getEmail(), $mail['subject'], $mail['html']);
+    }
+
+    /** « C'est noté / bienvenue » (marketing). */
     public function sendWelcome(Subscription $s): bool
     {
-        $mail = $this->renderer->welcome($s);
+        $mail = $this->renderer->welcome($s, $this->unsubscribeUrl($s->getUser()));
 
-        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html'], $this->oneClickUrl($s->getUser()));
     }
 
-    /** Email de bienvenue à la création de compte. */
-    public function sendAccountWelcome(string $email, string $firstName = ''): bool
-    {
-        $mail = $this->renderer->accountWelcome($firstName);
-
-        return $this->send($email, $mail['subject'], $mail['html']);
-    }
-
-    /** Le produit attendu est en ligne : envoyé aux inscrits « coming soon ». */
+    /** Le produit attendu est en ligne : envoyé aux inscrits « coming soon » (marketing). */
     public function sendLaunchLive(Subscription $s, string $productName, string $url): bool
     {
-        $mail = $this->renderer->launchLive($s, $productName, $url);
+        $mail = $this->renderer->launchLive($s, $productName, $url, $this->unsubscribeUrl($s->getUser()));
 
-        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html'], $this->oneClickUrl($s->getUser()));
     }
 
-    /** Le produit est de retour en stock : envoyé aux inscrits « épuisé ». */
+    /** Le produit est de retour en stock (marketing). */
     public function sendBackInStock(Subscription $s, string $productName, string $url): bool
     {
-        $mail = $this->renderer->backInStock($s, $productName, $url);
+        $mail = $this->renderer->backInStock($s, $productName, $url, $this->unsubscribeUrl($s->getUser()));
 
-        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html'], $this->oneClickUrl($s->getUser()));
     }
 
     /** Generic transactional send. Never throws; no-ops gracefully without an API key. */
     public function sendEmail(string $to, string $subject, string $html): bool
     {
         return $this->send($to, $subject, $html);
+    }
+
+    /** Lien humain de désinscription (page front avec réglages fins). */
+    private function unsubscribeUrl(?User $user): ?string
+    {
+        $token = $user?->getUnsubscribeToken();
+
+        return ($token === null || $token === '')
+            ? null
+            : sprintf('%s/desabonnement?token=%s', rtrim($this->frontUrl, '/'), rawurlencode($token));
+    }
+
+    /** Endpoint API one-click pour l'en-tête List-Unsubscribe (POST du client mail). */
+    private function oneClickUrl(?User $user): ?string
+    {
+        $token = $user?->getUnsubscribeToken();
+
+        return ($token === null || $token === '')
+            ? null
+            : sprintf('%s/api/unsubscribe/%s', rtrim($this->apiUrl, '/'), rawurlencode($token));
     }
 
     /**
@@ -114,7 +144,7 @@ class ResendMailer
         }
     }
 
-    private function send(string $to, string $subject, string $html): bool
+    private function send(string $to, string $subject, string $html, ?string $unsubscribeUrl = null): bool
     {
         if ($this->resendApiKey === '') {
             $this->logger->info('ResendMailer: RESEND_API_KEY absent, email non envoyé (no-op).', [
@@ -125,15 +155,24 @@ class ResendMailer
             return false;
         }
 
+        $payload = [
+            'from' => $this->fromAddress,
+            'to' => [$to],
+            'subject' => $subject,
+            'html' => $html,
+        ];
+        // List-Unsubscribe (RFC 8058) : bouton « Se désabonner » natif Gmail/Apple Mail.
+        if ($unsubscribeUrl !== null) {
+            $payload['headers'] = [
+                'List-Unsubscribe' => sprintf('<%s>', $unsubscribeUrl),
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ];
+        }
+
         try {
             $response = $this->httpClient->request('POST', 'https://api.resend.com/emails', [
                 'auth_bearer' => $this->resendApiKey,
-                'json' => [
-                    'from' => $this->fromAddress,
-                    'to' => [$to],
-                    'subject' => $subject,
-                    'html' => $html,
-                ],
+                'json' => $payload,
             ]);
 
             $status = $response->getStatusCode();

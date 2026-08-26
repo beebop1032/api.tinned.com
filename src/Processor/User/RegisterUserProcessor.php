@@ -25,6 +25,8 @@ readonly class RegisterUserProcessor implements ProcessorInterface
         private JWTTokenManagerInterface $jwtManager,
         private UserRepository $userRepository,
         private ResendMailer $mailer,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%env(APP_FRONT_URL)%')]
+        private string $frontUrl = 'http://localhost:4001',
     ) {}
 
     /**
@@ -40,9 +42,11 @@ readonly class RegisterUserProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Invalid data type');
         }
 
-        $email = trim($data->email);
+        $email = strtolower(trim($data->email));
 
-        if($this->userRepository->findOneByEmail($email)) {
+        $existing = $this->userRepository->findOneByEmail($email);
+        if ($existing instanceof User && $existing->getPassword() !== null) {
+            // Vrai compte (avec mot de passe) : on refuse le doublon.
             $violations = new ConstraintViolationList([
                 new ConstraintViolation(
                     message: "Un compte existe déjà avec cette adresse email. Connectez-vous ou réinitialisez votre mot de passe.",
@@ -57,9 +61,9 @@ readonly class RegisterUserProcessor implements ProcessorInterface
             throw new ValidationException($violations);
         }
 
-        $user = new User();
+        // Nouveau compte, ou « réclamation » d'un lead existant (email capturé sans mot de passe).
+        $user = $existing instanceof User ? $existing : (new User())->setEmail($email);
         $user
-            ->setEmail($email)
             ->setFirstName(trim($data->firstName))
             ->setLastName(trim($data->lastName))
             ->setPhone(trim($data->phone))
@@ -69,14 +73,31 @@ readonly class RegisterUserProcessor implements ProcessorInterface
             ->setMarketingConsent($data->marketingConsent)
             ->setMarketingConsentUpdatedAt(new \DateTimeImmutable());
 
+        if ($user->getUnsubscribeToken() === null) {
+            $user->setUnsubscribeToken(bin2hex(random_bytes(24)));
+        }
+
+        // Vérification d'email requise, sauf si le lead avait déjà validé son email.
+        $needsVerification = !$user->isEmailVerified();
+        if ($needsVerification) {
+            $user->setEmailVerifyToken(bin2hex(random_bytes(24)));
+        }
+
         $this->em->persist($user);
         $this->em->flush();
 
-        // Email de bienvenue (point de confirmation unique). Ne doit jamais casser l'inscription.
-        try {
-            $this->mailer->sendAccountWelcome($user->getEmail(), (string) $user->getFirstName());
-        } catch (\Throwable) {
-            // Le mailer loggue déjà ses échecs.
+        // Email de vérification (transactionnel). Ne doit jamais casser l'inscription.
+        if ($needsVerification) {
+            try {
+                $verifyUrl = sprintf(
+                    '%s/confirmer-email?token=%s',
+                    rtrim($this->frontUrl, '/'),
+                    rawurlencode((string) $user->getEmailVerifyToken()),
+                );
+                $this->mailer->sendVerification($user, $verifyUrl);
+            } catch (\Throwable) {
+                // Le mailer loggue déjà ses échecs.
+            }
         }
 
         $token = $this->jwtManager->create($user);

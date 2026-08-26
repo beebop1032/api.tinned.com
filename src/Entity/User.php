@@ -19,6 +19,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_OAUTH_ACCOUNT', fields: ['oauthProvider', 'oauthId'])]
 #[ORM\Index(name: 'IDX_USER_PASSWORD_RESET_TOKEN', columns: ['password_reset_token_hash'])]
+#[ORM\Index(name: 'IDX_USER_EMAIL_VERIFY_TOKEN', columns: ['email_verify_token'])]
+#[ORM\Index(name: 'IDX_USER_UNSUBSCRIBE_TOKEN', columns: ['unsubscribe_token'])]
 #[ApiResource(
     normalizationContext: ['groups' => ['account:read']],
     operations: [
@@ -63,7 +65,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['account:read', 'account:write'])]
     private array $roles = [];
 
-    #[ORM\Column]
+    // Nullable : un « lead » (email capturé via newsletter / « préviens-moi ») n'a pas
+    // de mot de passe tant qu'il n'a pas activé son compte.
+    #[ORM\Column(nullable: true)]
     private ?string $password = null;
 
     #[ORM\Column(length: 50, nullable: true)]
@@ -93,6 +97,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     #[Groups(['account:read'])]
     private ?\DateTimeImmutable $marketingConsentUpdatedAt = null;
+
+    // Vérification d'email : null tant que l'email n'est pas confirmé. Le token du lien
+    // de vérification (usage unique) ; jamais sérialisé.
+    #[ORM\Column(nullable: true)]
+    #[Groups(['account:read'])]
+    private ?\DateTimeImmutable $emailVerifiedAt = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $emailVerifyToken = null;
+
+    // Token stable du lien de désinscription marketing ; jamais sérialisé.
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $unsubscribeToken = null;
 
     public function getId(): ?int
     {
@@ -281,6 +298,47 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setMarketingConsentUpdatedAt(?\DateTimeImmutable $marketingConsentUpdatedAt): User
     {
         $this->marketingConsentUpdatedAt = $marketingConsentUpdatedAt;
+
+        return $this;
+    }
+
+    public function getEmailVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerifiedAt;
+    }
+
+    public function setEmailVerifiedAt(?\DateTimeImmutable $emailVerifiedAt): User
+    {
+        $this->emailVerifiedAt = $emailVerifiedAt;
+
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerifiedAt !== null;
+    }
+
+    public function getEmailVerifyToken(): ?string
+    {
+        return $this->emailVerifyToken;
+    }
+
+    public function setEmailVerifyToken(?string $emailVerifyToken): User
+    {
+        $this->emailVerifyToken = $emailVerifyToken;
+
+        return $this;
+    }
+
+    public function getUnsubscribeToken(): ?string
+    {
+        return $this->unsubscribeToken;
+    }
+
+    public function setUnsubscribeToken(?string $unsubscribeToken): User
+    {
+        $this->unsubscribeToken = $unsubscribeToken;
 
         return $this;
     }

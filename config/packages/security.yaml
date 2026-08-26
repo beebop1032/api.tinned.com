@@ -79,6 +79,9 @@ security:
         - { path: ^/api/coupons/validate$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/subscriptions$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/subscriptions/confirm/, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/account/verify-email$, roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/account/set-password$, roles: IS_AUTHENTICATED_FULLY, methods: [POST] }
+        - { path: ^/api/unsubscribe/, roles: PUBLIC_ACCESS }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api/(delivery_methods|shipping_labels|store_orders), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
         - { path: ^/api/(landing_pages|static_pages), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }

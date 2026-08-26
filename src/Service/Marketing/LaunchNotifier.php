@@ -77,6 +77,13 @@ class LaunchNotifier
         $sent = 0;
 
         foreach ($pending as $subscription) {
+            // Respecte l'opt-out global : un désabonné marketing ne reçoit rien (mais
+            // n'est pas marqué notifié, au cas où il se réabonnerait plus tard).
+            $subUser = $subscription->getUser();
+            if ($subUser !== null && !$subUser->hasMarketingConsent()) {
+                continue;
+            }
+
             try {
                 $send($subscription, $name, $url);
             } catch (\Throwable $e) {
