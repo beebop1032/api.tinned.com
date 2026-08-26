@@ -9,6 +9,7 @@ use App\Model\User\RequestPasswordReset;
 use App\Repository\UserRepository;
 use App\Service\Marketing\ResendMailer;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 readonly class RequestPasswordResetProcessor implements ProcessorInterface
 {
@@ -16,7 +17,9 @@ readonly class RequestPasswordResetProcessor implements ProcessorInterface
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private ResendMailer $mailer,
-        private string $publicBaseUrl,
+        // Le lien de reset pointe vers une PAGE FRONT (/auth?reset=…), pas vers l'API.
+        #[Autowire('%env(APP_FRONT_URL)%')]
+        private string $frontUrl,
     ) {
     }
 
@@ -41,7 +44,7 @@ readonly class RequestPasswordResetProcessor implements ProcessorInterface
 
             $link = sprintf(
                 '%s/auth?reset=%s',
-                rtrim($this->publicBaseUrl, '/'),
+                rtrim($this->frontUrl, '/'),
                 rawurlencode($token)
             );
 

@@ -39,10 +39,6 @@ services:
         arguments:
             $deepLinkScheme: '%env(APP_OAUTH_DEEP_LINK_SCHEME)%'
 
-    App\Processor\User\RequestPasswordResetProcessor:
-        arguments:
-            $publicBaseUrl: '%app.public_base_url%'
-
     App\Service\Shipping\ShippingSender:
         arguments:
             $name: '%env(SHIPPING_SENDER_NAME)%'
