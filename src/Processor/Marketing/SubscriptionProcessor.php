@@ -75,10 +75,11 @@ class SubscriptionProcessor implements ProcessorInterface
             if ($user->getUnsubscribeToken() === null) {
                 $user->setUnsubscribeToken(bin2hex(random_bytes(24)));
             }
+            // On (re)génère + envoie un mail de vérification UNIQUEMENT si le user non
+            // vérifié n'a pas déjà un token en attente : pas de spam si on suit plusieurs
+            // produits avant d'avoir cliqué le premier lien.
             if (!$user->isEmailVerified() && $user->getEmailVerifyToken() === null) {
                 $user->setEmailVerifyToken(bin2hex(random_bytes(24)));
-                $newVerificationNeeded = true;
-            } elseif (!$user->isEmailVerified()) {
                 $newVerificationNeeded = true;
             }
         }
