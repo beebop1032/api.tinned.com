@@ -44,6 +44,14 @@ class ResendMailer
         return $this->send((string) $user->getEmail(), $mail['subject'], $mail['html']);
     }
 
+    /** Réinitialisation de mot de passe (transactionnel). */
+    public function sendPasswordReset(User $user, string $link): bool
+    {
+        $mail = $this->renderer->passwordReset($user, $link);
+
+        return $this->send((string) $user->getEmail(), $mail['subject'], $mail['html']);
+    }
+
     /** « C'est noté / bienvenue » (marketing). */
     public function sendWelcome(Subscription $s): bool
     {

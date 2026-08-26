@@ -42,7 +42,6 @@ services:
     App\Processor\User\RequestPasswordResetProcessor:
         arguments:
             $publicBaseUrl: '%app.public_base_url%'
-            $mailerFrom: '%app.mailer_from%'
 
     App\Service\Shipping\ShippingSender:
         arguments:

@@ -63,6 +63,28 @@ class EmailRenderer
         ];
     }
 
+    /**
+     * Réinitialisation de mot de passe (transactionnel, pas de désinscription).
+     *
+     * @return array{subject: string, html: string}
+     */
+    public function passwordReset(User $user, string $link): array
+    {
+        $hi = trim((string) $user->getFirstName()) !== ''
+            ? sprintf('Bonjour %s,', $this->e(trim((string) $user->getFirstName())))
+            : 'Bonjour,';
+
+        $body = $this->paragraph($hi)
+            .$this->paragraph('Tu as demandé à réinitialiser ton mot de passe. Clique ci-dessous pour en choisir un nouveau. Ce lien expire dans une heure.')
+            .$this->button('Choisir un nouveau mot de passe', $link)
+            .$this->fine('Si tu n\'es pas à l\'origine de cette demande, ignore cet email — ton mot de passe reste inchangé.');
+
+        return [
+            'subject' => 'Réinitialise ton mot de passe Tinned',
+            'html' => $this->layout('Réinitialise ton mot de passe', $body, 'Choisis un nouveau mot de passe.'),
+        ];
+    }
+
     // ---- Marketing (footer avec désinscription) -------------------------------
 
     /** @return array{subject: string, html: string} */

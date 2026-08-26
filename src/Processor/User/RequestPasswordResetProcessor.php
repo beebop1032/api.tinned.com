@@ -7,18 +7,16 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Model\User\PasswordResetResponse;
 use App\Model\User\RequestPasswordReset;
 use App\Repository\UserRepository;
+use App\Service\Marketing\ResendMailer;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
 
 readonly class RequestPasswordResetProcessor implements ProcessorInterface
 {
     public function __construct(
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
-        private MailerInterface $mailer,
+        private ResendMailer $mailer,
         private string $publicBaseUrl,
-        private string $mailerFrom
     ) {
     }
 
@@ -47,17 +45,8 @@ readonly class RequestPasswordResetProcessor implements ProcessorInterface
                 rawurlencode($token)
             );
 
-            $this->mailer->send(
-                (new Email())
-                    ->from($this->mailerFrom)
-                    ->to((string) $user->getEmail())
-                    ->subject('Réinitialisez votre mot de passe Tinned')
-                    ->text(
-                        "Bonjour,\n\nPour choisir un nouveau mot de passe, ouvrez ce lien :\n"
-                        .$link
-                        ."\n\nCe lien expire dans une heure. Si vous n'avez pas demandé ce changement, ignorez cet email.\n\nTinned"
-                    )
-            );
+            // Envoi via Resend (ResendMailer ne lève jamais ; loggue ses échecs).
+            $this->mailer->sendPasswordReset($user, $link);
         }
 
         return new PasswordResetResponse(
