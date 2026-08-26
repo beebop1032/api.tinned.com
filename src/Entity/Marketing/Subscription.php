@@ -20,7 +20,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'subscription')]
-#[ORM\Index(name: 'IDX_SUBSCRIPTION_CONFIRM_TOKEN', columns: ['confirm_token'])]
 #[ApiResource(
     normalizationContext: ['groups' => ['subscription:read']],
     denormalizationContext: ['groups' => ['subscription:write']],
@@ -92,10 +91,6 @@ class Subscription
     #[Groups(['subscription:read'])]
     private string $status = self::STATUS_PENDING;
 
-    // NEVER exposed in any serialization group.
-    #[ORM\Column(length: 64, nullable: true)]
-    private ?string $confirmToken = null;
-
     #[ORM\Column(nullable: true)]
     #[Groups(['subscription:read'])]
     private ?\DateTimeImmutable $confirmedAt = null;
@@ -134,8 +129,6 @@ class Subscription
     public function setConsentTinned(bool $consentTinned): static { $this->consentTinned = $consentTinned; return $this; }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): static { $this->status = $status; return $this; }
-    public function getConfirmToken(): ?string { return $this->confirmToken; }
-    public function setConfirmToken(?string $confirmToken): static { $this->confirmToken = $confirmToken; return $this; }
     public function getConfirmedAt(): ?\DateTimeImmutable { return $this->confirmedAt; }
     public function setConfirmedAt(?\DateTimeImmutable $confirmedAt): static { $this->confirmedAt = $confirmedAt; return $this; }
     public function getNotifiedAt(): ?\DateTimeImmutable { return $this->notifiedAt; }

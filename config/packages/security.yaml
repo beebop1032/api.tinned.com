@@ -78,7 +78,6 @@ security:
         - { path: ^/api/me$, roles: PUBLIC_ACCESS }
         - { path: ^/api/coupons/validate$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/subscriptions$, roles: PUBLIC_ACCESS, methods: [POST] }
-        - { path: ^/api/subscriptions/confirm/, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/account/verify-email$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/account/set-password$, roles: IS_AUTHENTICATED_FULLY, methods: [POST] }
         - { path: ^/api/unsubscribe/, roles: PUBLIC_ACCESS }
