@@ -9,7 +9,6 @@ use App\Entity\User;
 use App\Service\Marketing\ResendMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class SubscriptionProcessor implements ProcessorInterface
 {
@@ -17,8 +16,6 @@ class SubscriptionProcessor implements ProcessorInterface
         private readonly EntityManagerInterface $em,
         private readonly Security $security,
         private readonly ResendMailer $mailer,
-        #[Autowire('%env(APP_FRONT_URL)%')]
-        private readonly string $frontUrl = 'http://localhost:4001',
     ) {
     }
 
@@ -47,42 +44,28 @@ class SubscriptionProcessor implements ProcessorInterface
             return $existing;
         }
 
+        // Opt-in simple : le consentement est donné au moment de l'action (case CGU
+        // côté anonyme, ou le bouton « je veux être prévenu » côté connecté). Pas de
+        // double opt-in : on confirme directement et on envoie un email « c'est noté ».
         $user = $this->security->getUser();
-
         if ($user instanceof User) {
-            // Connected = 1-click opt-in.
             $data->setUser($user);
-            $data->setStatus(Subscription::STATUS_CONFIRMED);
-            $data->setConfirmedAt(new \DateTimeImmutable());
-            $data->setConfirmToken(null);
-
-            $this->em->persist($data);
-            $this->em->flush();
-
-            $this->safeSend(fn () => $this->mailer->sendWelcome($data));
-            // Déclenche une éventuelle séquence Resend (relances J+3, etc.). Le welcome
-            // reste envoyé directement ci-dessus : l'automation ne doit pas le redoubler.
-            $this->safeSend(fn () => $this->mailer->sendEvent('subscription.confirmed', $data->getEmail(), [
-                'targetType' => $data->getTargetType(),
-                'locale' => $data->getLocale(),
-            ]));
-
-            return $data;
         }
-
-        // Anonymous = double opt-in.
-        $data->setStatus(Subscription::STATUS_PENDING);
-        $data->setConfirmToken(bin2hex(random_bytes(24)));
+        $data->setStatus(Subscription::STATUS_CONFIRMED);
+        $data->setConfirmedAt(new \DateTimeImmutable());
+        $data->setConfirmToken(null);
 
         $this->em->persist($data);
         $this->em->flush();
 
-        $confirmUrl = sprintf(
-            '%s/abonnement/confirme?token=%s',
-            rtrim($this->frontUrl, '/'),
-            rawurlencode((string) $data->getConfirmToken())
-        );
-        $this->safeSend(fn () => $this->mailer->sendConfirmation($data, $confirmUrl));
+        // Email « c'est noté / bienvenue » (contextuel produit / box / newsletter).
+        $this->safeSend(fn () => $this->mailer->sendWelcome($data));
+        // Déclenche une éventuelle séquence Resend (relances). Le welcome part en direct :
+        // l'automation ne doit pas le redoubler.
+        $this->safeSend(fn () => $this->mailer->sendEvent('subscription.confirmed', $data->getEmail(), [
+            'targetType' => $data->getTargetType(),
+            'locale' => $data->getLocale(),
+        ]));
 
         return $data;
     }

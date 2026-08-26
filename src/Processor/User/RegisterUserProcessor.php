@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Model\User\RegisterUser;
 use App\Model\User\RegisterUserResponse;
 use App\Repository\UserRepository;
+use App\Service\Marketing\ResendMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Random\RandomException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -22,7 +23,8 @@ readonly class RegisterUserProcessor implements ProcessorInterface
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $hasher,
         private JWTTokenManagerInterface $jwtManager,
-        private UserRepository $userRepository
+        private UserRepository $userRepository,
+        private ResendMailer $mailer,
     ) {}
 
     /**
@@ -69,6 +71,13 @@ readonly class RegisterUserProcessor implements ProcessorInterface
 
         $this->em->persist($user);
         $this->em->flush();
+
+        // Email de bienvenue (point de confirmation unique). Ne doit jamais casser l'inscription.
+        try {
+            $this->mailer->sendAccountWelcome($user->getEmail(), (string) $user->getFirstName());
+        } catch (\Throwable) {
+            // Le mailer loggue déjà ses échecs.
+        }
 
         $token = $this->jwtManager->create($user);
 

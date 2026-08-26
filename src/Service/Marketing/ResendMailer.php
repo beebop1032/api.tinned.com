@@ -19,6 +19,7 @@ class ResendMailer
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
+        private readonly EmailRenderer $renderer,
         #[Autowire('%env(string:RESEND_API_KEY)%')]
         private readonly string $resendApiKey = '',
         #[Autowire('%env(RESEND_FROM)%')]
@@ -26,70 +27,35 @@ class ResendMailer
     ) {
     }
 
-    public function sendConfirmation(Subscription $s, string $confirmUrl): bool
-    {
-        $html = sprintf(
-            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
-            .'<h2>Confirmez votre abonnement</h2>'
-            .'<p>Bonjour,</p>'
-            .'<p>Merci de votre intérêt pour Tinned. Pour finaliser votre abonnement, cliquez sur le lien ci-dessous :</p>'
-            .'<p><a href="%s" style="display:inline-block;padding:12px 24px;background:#E8A33D;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Confirmer mon abonnement</a></p>'
-            .'<p style="color:#666;font-size:13px">Si vous n\'êtes pas à l\'origine de cette demande, ignorez simplement cet email.</p>'
-            .'<p>L\'équipe Tinned</p>'
-            .'</div>',
-            htmlspecialchars($confirmUrl, ENT_QUOTES)
-        );
-
-        return $this->send($s->getEmail(), 'Confirmez votre abonnement Tinned', $html);
-    }
-
     public function sendWelcome(Subscription $s): bool
     {
-        $html =
-            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
-            .'<h2>Bienvenue chez Tinned 🎉</h2>'
-            .'<p>Bonjour,</p>'
-            .'<p>Votre abonnement est confirmé. Nous vous tiendrons informé dès qu\'il y a du nouveau.</p>'
-            .'<p>À très vite,<br>L\'équipe Tinned</p>'
-            .'</div>';
+        $mail = $this->renderer->welcome($s);
 
-        return $this->send($s->getEmail(), 'Bienvenue chez Tinned', $html);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
+    }
+
+    /** Email de bienvenue à la création de compte. */
+    public function sendAccountWelcome(string $email, string $firstName = ''): bool
+    {
+        $mail = $this->renderer->accountWelcome($firstName);
+
+        return $this->send($email, $mail['subject'], $mail['html']);
     }
 
     /** Le produit attendu est en ligne : envoyé aux inscrits « coming soon ». */
     public function sendLaunchLive(Subscription $s, string $productName, string $url): bool
     {
-        $html = sprintf(
-            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
-            .'<h2>C\'est en ligne 🎉</h2>'
-            .'<p>Bonjour,</p>'
-            .'<p><strong>%s</strong> est désormais disponible sur Tinned. Vous nous aviez demandé d\'être prévenu·e — c\'est le moment&nbsp;!</p>'
-            .'<p><a href="%s" style="display:inline-block;padding:12px 24px;background:#E8A33D;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Découvrir le produit</a></p>'
-            .'<p>À très vite,<br>L\'équipe Tinned</p>'
-            .'</div>',
-            htmlspecialchars($productName, ENT_QUOTES),
-            htmlspecialchars($url, ENT_QUOTES)
-        );
+        $mail = $this->renderer->launchLive($s, $productName, $url);
 
-        return $this->send($s->getEmail(), sprintf('%s est disponible sur Tinned', $productName), $html);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
     }
 
     /** Le produit est de retour en stock : envoyé aux inscrits « épuisé ». */
     public function sendBackInStock(Subscription $s, string $productName, string $url): bool
     {
-        $html = sprintf(
-            '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1a1a1a">'
-            .'<h2>De retour en stock 📦</h2>'
-            .'<p>Bonjour,</p>'
-            .'<p><strong>%s</strong> est de nouveau disponible. Les stocks sont limités, ne tardez pas.</p>'
-            .'<p><a href="%s" style="display:inline-block;padding:12px 24px;background:#E8A33D;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Commander maintenant</a></p>'
-            .'<p>À très vite,<br>L\'équipe Tinned</p>'
-            .'</div>',
-            htmlspecialchars($productName, ENT_QUOTES),
-            htmlspecialchars($url, ENT_QUOTES)
-        );
+        $mail = $this->renderer->backInStock($s, $productName, $url);
 
-        return $this->send($s->getEmail(), sprintf('%s est de retour en stock', $productName), $html);
+        return $this->send($s->getEmail(), $mail['subject'], $mail['html']);
     }
 
     /** Generic transactional send. Never throws; no-ops gracefully without an API key. */
