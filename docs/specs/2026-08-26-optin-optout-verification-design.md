@@ -20,8 +20,9 @@ Il n'existe plus de parcours « anonyme ». Trois portes d'entrée, un seul mod�
 | Newsletter (home) | `User` (lead) | aucun (nullable) | lead marketing actif |
 | « Préviens-moi » produit | `User` (lead) + `Subscription` | aucun | abonnement activé + mail « c'est noté » |
 
-Un lead (email sans mot de passe) pourra définir un mot de passe plus tard via le
-flux « mot de passe oublié » existant. `User.password` est déjà nullable.
+Un lead (email sans mot de passe) définit un mot de passe soit **à la vérification**
+(inline, autorisé par le token de vérif), soit plus tard via « mot de passe oublié ».
+Voir la section « Stratégie mot de passe ». `User.password` est déjà nullable.
 
 ## Données
 
@@ -74,6 +75,29 @@ flux « mot de passe oublié » existant. `User.password` est déjà nullable.
 - La **page** de désinscription permet en plus de couper « le fait d'être informé » :
   passer ses `Subscription` product/box en `unsubscribed`.
 
+## Stratégie mot de passe
+
+Les leads (email sans mot de passe) doivent pouvoir devenir un vrai compte, sans
+2e email superflu. Le lien de vérification prouvant déjà la possession de l'email,
+on s'en sert pour autoriser la définition du mot de passe.
+
+- **Lead** : `User.password = null`. **Ne peut pas se connecter** (le login rejette
+  proprement un mot de passe null → message « définis ton mot de passe »). Il reçoit
+  quand même ses emails.
+- **Définition inline à la vérification** : la page `/confirmer-email?token=…` confirme
+  l'email puis propose « Définis un mot de passe pour accéder à ton compte ». Le token
+  de vérification (à usage unique, non expiré) autorise le `POST` de définition du mot
+  de passe. S'il ne le fait pas, il reste un lead vérifié.
+- **Plus tard** : un lead peut définir son mot de passe via le flux « mot de passe
+  oublié » existant (`passwordResetTokenHash` + expiry déjà en place).
+- **Réclamation** : une inscription complète sur un email déjà lead **complète** le
+  compte existant (pose mot de passe + nom + `acceptedTerms`) au lieu de renvoyer
+  « un compte existe déjà ». Si le compte a déjà un mot de passe → message habituel
+  « connecte-toi / mot de passe oublié ».
+- **Sécurité** : le `POST` de définition via token de vérif n'est permis que si
+  `password === null` (on ne change jamais un mot de passe existant par ce chemin ;
+  les changements passent par le reset).
+
 ## Emails
 
 **Transactionnels (toujours envoyés, pas de lien d'opt-out marketing)** :
@@ -117,12 +141,16 @@ Tous rendus par `EmailRenderer` (layout brandé déjà en place), tutoiement.
 ## Hors scope (plus tard)
 
 - Séquences / automations marketing post-lancement (Resend Automations, event déjà émis).
-- Magic-link login pour les leads (ils passent par « mot de passe oublié » en attendant).
+- Magic-link login pour les leads (définition de mot de passe suffit pour le moment).
 - Centre de préférences complet (granularité par type de contenu) au-delà du on/off.
+
+## Données existantes
+
+Les `Subscription` déjà en base ne sont que des tests → **purge** au moment de la
+migration (pas de rattachement à conserver).
 
 ## Points ouverts / risques
 
-- **Migration des `Subscription` existants** en prod (lignes `pending`/`confirmed` sans
-  User rattaché) : script de rattachement par email, ou purge si négligeable.
-- **Leads sans mot de passe** : s'assurer qu'ils ne peuvent pas se « connecter » sans
-  passer par la définition d'un mot de passe.
+- **Login mot de passe null** : vérifier que l'authenticator Symfony rejette proprement
+  un `User` sans mot de passe (pas d'exception) et renvoie le message « définis ton mot
+  de passe ». À couvrir par un test.
