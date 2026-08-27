@@ -15,6 +15,7 @@ use Mollie\Api\MollieApiClient;
 class MollieService
 {
     private MollieApiClient $mollie;
+    private bool $apiKeyReady = false;
 
     public function __construct(
         private string $apiKey,
@@ -26,7 +27,23 @@ class MollieService
         private InvoiceNumberAllocator $invoiceNumberAllocator,
     ) {
         $this->mollie = new MollieApiClient();
-        $this->mollie->setApiKey($this->apiKey);
+    }
+
+    /**
+     * Client Mollie avec la clé posée paresseusement. setApiKey() valide le format et
+     * LÈVE sur une clé vide/placeholder — le faire ici (et non dans le constructeur)
+     * évite de faire planter en 500 tout le checkout dès l'instanciation du service :
+     * une clé manquante dégrade proprement en 422 « paiement indisponible » via le
+     * try/catch de CheckoutProcessor.
+     */
+    private function client(): MollieApiClient
+    {
+        if (!$this->apiKeyReady) {
+            $this->mollie->setApiKey($this->apiKey);
+            $this->apiKeyReady = true;
+        }
+
+        return $this->mollie;
     }
 
     public function createPayment(CustomerOrder $order): string
@@ -46,11 +63,11 @@ class MollieService
         // Send the order lines to Mollie when they reconcile exactly to the total.
         $lines = $this->buildLines($order);
         try {
-            $payment = $this->mollie->payments->create($lines === [] ? $payload : $payload + ['lines' => $lines]);
+            $payment = $this->client()->payments->create($lines === [] ? $payload : $payload + ['lines' => $lines]);
         } catch (ApiException) {
             // Mollie rejected the lines (validation/rounding/method): retry on the total alone,
             // which is exact. A payment must never fail because of the (optional) line details.
-            $payment = $this->mollie->payments->create($payload);
+            $payment = $this->client()->payments->create($payload);
         }
 
         $order->setMolliePaymentId($payment->id);
@@ -185,7 +202,7 @@ class MollieService
 
     public function handleWebhook(string $paymentId): void
     {
-        $payment = $this->mollie->payments->get($paymentId);
+        $payment = $this->client()->payments->get($paymentId);
         $orderId = $payment->metadata->orderId ?? null;
         if (!$orderId) {
             return;
