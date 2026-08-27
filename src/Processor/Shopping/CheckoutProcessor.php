@@ -29,7 +29,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
 
 readonly class CheckoutProcessor implements ProcessorInterface
 {
-    private const PAYMENT_METHODS = ['card', 'bancontact', 'paypal', 'kbc', 'belfius', 'ideal'];
+    // 'mollie' = pas de pré-sélection ; la page Mollie affiche les moyens activés sur le
+    // compte (PayPal retiré). Les valeurs spécifiques restent acceptées (compat).
+    private const PAYMENT_METHODS = ['mollie', 'card', 'bancontact', 'kbc', 'belfius', 'ideal'];
 
     /**
      * Discount granted for pre-ordering a not-yet-released product (coming_soon/preorder).

@@ -51,9 +51,8 @@ class MollieService
         $payload = [
             'amount' => $this->money($order->getTotalCents(), $order->getCurrency()),
             'description' => 'Tinned order ' . $order->getReference(),
-            // Pre-select the buyer's chosen method so Mollie opens straight on it
-            // (Bancontact dominates in BE) instead of defaulting to card.
-            'method' => $this->preferredMethod($order),
+            // Pas de pré-sélection de méthode : la page Mollie affiche les moyens de
+            // paiement activés sur le compte (« juste un lien vers Mollie »).
             // The confirmation page reads ?order=<reference> (id or reference both match).
             'redirectUrl' => $this->redirectUrl . '?order=' . rawurlencode($order->getReference()),
             'webhookUrl' => $this->webhookUrl,
@@ -186,18 +185,6 @@ class MollieService
                 ->setNetCents($gross - $commission)
                 ->setCommissionRatePercent($rate)
         );
-    }
-
-    private function preferredMethod(CustomerOrder $order): string
-    {
-        $chosen = $order->getPaymentMethod();
-        if (is_string($chosen) && $chosen !== '') {
-            return $chosen;
-        }
-
-        $countryCode = $order->getShippingAddress()?->getCountryCode();
-
-        return $countryCode === 'BE' ? 'bancontact' : 'card';
     }
 
     public function handleWebhook(string $paymentId): void

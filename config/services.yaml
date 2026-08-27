@@ -72,5 +72,7 @@ services:
     App\Service\Payment\MollieService:
         arguments:
             $apiKey: '%env(MOLLIE_API_KEY)%'
-            $redirectUrl: '%env(MOLLIE_REDIRECT_URL)%'
+            # URL de retour = page de confirmation du front. Dérivée d'APP_FRONT_URL
+            # (une seule source de vérité) : évite le footgun d'un localhost en prod.
+            $redirectUrl: '%env(APP_FRONT_URL)%/checkout/confirmation'
             $webhookUrl: '%env(MOLLIE_WEBHOOK_URL)%'
