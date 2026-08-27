@@ -31,8 +31,9 @@ class SeedDeliveryMethodsCommand extends Command
 
     /** @var list<array{code: string, method: string, name: string, recommended: bool, position: int, baseCents: int}> */
     private const METHODS = [
-        ['code' => 'bpost-home',   'method' => DeliveryMethod::METHOD_HOME,   'name' => 'Bpost à domicile',  'recommended' => true,  'position' => 1, 'baseCents' => 595],
-        ['code' => 'bpost-locker', 'method' => DeliveryMethod::METHOD_LOCKER, 'name' => 'Bpost Point Colis', 'recommended' => false, 'position' => 2, 'baseCents' => 395],
+        ['code' => 'bpost-home', 'method' => DeliveryMethod::METHOD_HOME, 'name' => 'Bpost à domicile', 'recommended' => true, 'position' => 1, 'baseCents' => 595],
+        // Bpost Point Colis (locker) : réactivé quand la sélection de point relais sera
+        // intégrée (geowidget Bpost). Un locker sans choix de point n'a pas de sens.
     ];
 
     private const COUNTRIES = ['BE', 'FR'];
