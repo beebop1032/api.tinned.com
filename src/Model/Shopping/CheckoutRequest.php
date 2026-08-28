@@ -32,8 +32,14 @@ class CheckoutRequest
     /** @var list<string> */
     public array $selectedStoreSlugs = [];
 
+    // Mollie method id chosen in the form (e.g. 'creditcard', 'bancontact', 'ideal'), or
+    // 'mollie' (default) to let Mollie's hosted page list every enabled method.
     #[Assert\NotBlank]
-    public string $paymentMethod = 'card';
+    public string $paymentMethod = 'mollie';
+
+    // Single-use Mollie Components token, sent only when paymentMethod is 'creditcard' and
+    // the card was entered on our page. Empty for redirect methods.
+    public ?string $cardToken = null;
 
     public ?string $couponCode = null;
 }

@@ -46,18 +46,29 @@ class MollieService
         return $this->mollie;
     }
 
-    public function createPayment(CustomerOrder $order): string
+    public function createPayment(CustomerOrder $order, ?string $method = null, ?string $cardToken = null): string
     {
         $payload = [
             'amount' => $this->money($order->getTotalCents(), $order->getCurrency()),
             'description' => 'Tinned order ' . $order->getReference(),
-            // Pas de pré-sélection de méthode : la page Mollie affiche les moyens de
-            // paiement activés sur le compte (« juste un lien vers Mollie »).
             // The confirmation page reads ?order=<reference> (id or reference both match).
             'redirectUrl' => $this->redirectUrl . '?order=' . rawurlencode($order->getReference()),
             'webhookUrl' => $this->webhookUrl,
             'metadata' => ['orderId' => $order->getId()],
         ];
+
+        // Pre-select the method chosen in the form so Mollie skips its own picker and sends
+        // the buyer straight to that method's flow. 'mollie' (or empty) = no pre-selection,
+        // i.e. the hosted page lists every enabled method (legacy behaviour, kept as fallback).
+        if ($method !== null && $method !== '' && $method !== 'mollie') {
+            $payload['method'] = $method;
+        }
+
+        // Card entered on our page via Mollie Components: the single-use token authorises the
+        // creditcard payment. 3-D Secure (SCA) may still add a redirect via getCheckoutUrl().
+        if ($cardToken !== null && $cardToken !== '') {
+            $payload['cardToken'] = $cardToken;
+        }
 
         // Send the order lines to Mollie when they reconcile exactly to the total.
         $lines = $this->buildLines($order);
@@ -72,7 +83,64 @@ class MollieService
         $order->setMolliePaymentId($payment->id);
         $this->em->flush();
 
-        return $payment->getCheckoutUrl();
+        // Null when the payment completes without a redirect (card, no 3-D Secure): the front
+        // then goes straight to the confirmation page.
+        return $payment->getCheckoutUrl() ?? '';
+    }
+
+    /**
+     * Payment methods enabled on the Mollie profile for the given amount and billing country,
+     * translated to the buyer's locale, shaped for the checkout form (id + label + official
+     * icons). Returns [] when Mollie can't be reached so the form can fall back to the hosted
+     * flow instead of breaking.
+     *
+     * @return list<array{id: string, description: string, image: array{size1x: string, size2x: string}}>
+     */
+    public function enabledMethods(int $amountCents, string $currency, string $country, string $locale): array
+    {
+        try {
+            $methods = $this->client()->methods->allEnabled([
+                'amount' => $this->money(max(0, $amountCents), $currency),
+                'locale' => $locale,
+                'billingCountry' => $country,
+            ]);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($methods as $method) {
+            $result[] = [
+                'id' => $method->id,
+                'description' => $method->description,
+                'image' => [
+                    'size1x' => $method->image->size1x ?? '',
+                    'size2x' => $method->image->size2x ?? '',
+                ],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Public profile id (pfl_...) of the Mollie account behind the configured API key. mollie.js
+     * needs it to embed the card fields; serving it from here (we already hold the key) means the
+     * front never has to configure it by hand. Null when Mollie can't be reached.
+     */
+    public function profileId(): ?string
+    {
+        try {
+            return $this->client()->profiles->getCurrent()->id;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** True when the configured API key is a test key — mollie.js must run in the same mode. */
+    public function isTestMode(): bool
+    {
+        return str_starts_with($this->apiKey, 'test_');
     }
 
     /** A Mollie amount object from integer cents (2-decimal string, dot separator). */
@@ -154,10 +222,6 @@ class MollieService
         return (int) round($ttcCents * $ratePercent / (100 + $ratePercent));
     }
 
-    /**
-     * Resolves the Mollie method to pre-select: the buyer's explicit choice when
-     * set, otherwise a country-aware default (Bancontact in Belgium, card elsewhere).
-     */
     /**
      * Records the frozen commission/payout line for a paid store order (once).
      */

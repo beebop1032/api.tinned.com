@@ -29,10 +29,6 @@ use Symfony\Component\Validator\ConstraintViolationList;
 
 readonly class CheckoutProcessor implements ProcessorInterface
 {
-    // 'mollie' = pas de pré-sélection ; la page Mollie affiche les moyens activés sur le
-    // compte (PayPal retiré). Les valeurs spécifiques restent acceptées (compat).
-    private const PAYMENT_METHODS = ['mollie', 'card', 'bancontact', 'kbc', 'belfius', 'ideal'];
-
     /**
      * Discount granted for pre-ordering a not-yet-released product (coming_soon/preorder).
      * Must stay aligned with PREORDER_DISCOUNT_PCT in front/lib/commerce.ts.
@@ -60,7 +56,10 @@ readonly class CheckoutProcessor implements ProcessorInterface
             $user = $this->resolveGuestUser($data);
         }
 
-        if (!in_array($data->paymentMethod, self::PAYMENT_METHODS, true)) {
+        // The form only submits ids returned by GET /payment-methods (Mollie's own enabled
+        // list), so Mollie is the authority on validity — no closed whitelist here, which would
+        // reject any method newly enabled in the Mollie dashboard. Keep a minimal sanity guard.
+        if (!preg_match('/^[a-z0-9_]{2,30}$/', $data->paymentMethod)) {
             $this->fail('paymentMethod', 'Unsupported payment method.');
         }
 
@@ -220,7 +219,7 @@ readonly class CheckoutProcessor implements ProcessorInterface
 
         $checkoutUrl = '';
         try {
-            $checkoutUrl = $this->mollieService->createPayment($order);
+            $checkoutUrl = $this->mollieService->createPayment($order, $data->paymentMethod, $data->cardToken);
         } catch (\Throwable) {
             // Payment could not be initiated: cancel and give the reserved stock/coupon back.
             $order->setStatus(CustomerOrder::STATUS_CANCELLED);
